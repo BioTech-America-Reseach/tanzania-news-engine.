@@ -511,4 +511,251 @@ function formatCategoryName(category) {
 function formatDate(dateString) {
     if (!dateString) return 'Sasa hivi';
     try {
-        const date = new Date(dateString
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Sasa hivi';
+        const now = new Date();
+        const diff = Math.floor((now - date) / 60000);
+        if (diff < 1) return 'Sasa hivi';
+        if (diff < 60) return `${diff}m iliyopita`;
+        if (diff < 1440) return `${Math.floor(diff / 60)}h iliyopita`;
+        return date.toLocaleDateString('sw-TZ', { day: 'numeric', month: 'short' });
+    } catch (e) {
+        return 'Sasa hivi';
+    }
+}
+
+// =============================================
+// CATEGORY SWITCHING
+// =============================================
+function switchCategory(category) {
+    document.querySelectorAll('.category-tab').forEach(tab => {
+        tab.classList.remove('active', 'bg-blue-600', 'text-white');
+        tab.classList.add('bg-gray-100', 'text-gray-700');
+    });
+    
+    const activeTab = document.querySelector(`[onclick="switchCategory('${category}')"]`);
+    if (activeTab) {
+        activeTab.classList.remove('bg-gray-100', 'text-gray-700');
+        activeTab.classList.add('active', 'bg-blue-600', 'text-white');
+    }
+    
+    AppState.currentCategory = category;
+    
+    // Filter stories
+    if (category === 'all') {
+        renderContent(AppState.stories);
+    } else {
+        const filtered = AppState.stories.filter(s => 
+            (s.category || '').toLowerCase() === category
+        );
+        renderContent(filtered.length > 0 ? filtered : AppState.stories.slice(0, 5));
+    }
+}
+
+// =============================================
+// MODAL FUNCTIONS
+// =============================================
+function openModal(storyId) {
+    const story = AppState.stories.find(s => s.id === storyId);
+    if (!story) return;
+    
+    DOM.modalTitle.textContent = story.title || 'Taarifa';
+    
+    const content = `
+        <div class="space-y-4">
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold text-xs">
+                    ${formatCategoryName(story.category)}
+                </span>
+                ${story.isAIGenerated ? `
+                    <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-semibold text-xs">
+                        <i class="fas fa-robot mr-1"></i> AI Generated
+                    </span>
+                ` : ''}
+                <span class="text-gray-400">${formatDate(story.published_date)}</span>
+            </div>
+            
+            <div class="prose max-w-none">
+                <p class="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    ${story.content || story.summary || 'Hakuna maelezo zaidi.'}
+                </p>
+            </div>
+            
+            ${story.structured_content ? `
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h4 class="font-bold text-sm text-gray-700 mb-2">
+                        <i class="fas fa-structure text-blue-600 mr-2"></i> Data kutoka AI
+                    </h4>
+                    <pre class="text-xs text-gray-600 overflow-x-auto bg-white p-3 rounded border">${JSON.stringify(story.structured_content, null, 2)}</pre>
+                </div>
+            ` : ''}
+            
+            <div class="border-t border-gray-200 pt-3 text-xs text-gray-400 flex flex-wrap gap-3">
+                <span><i class="fas fa-hashtag mr-1"></i>ID: ${story.id}</span>
+                <span><i class="fas fa-flag mr-1"></i>${story.source_count || 1} sources</span>
+                ${story.impact_rating ? `<span><i class="fas fa-exclamation-triangle mr-1"></i>Impact: ${story.impact_rating}/10</span>` : ''}
+            </div>
+        </div>
+    `;
+    
+    DOM.modalContent.innerHTML = content;
+    DOM.modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    DOM.modal.classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+// =============================================
+// AUDIO CONTROLS
+// =============================================
+function toggleAudio() {
+    if (!AppState.audioContext) {
+        try {
+            AppState.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+            console.error('Audio not supported');
+            return;
+        }
+    }
+    
+    AppState.isPlaying = !AppState.isPlaying;
+    
+    if (AppState.isPlaying) {
+        if (AppState.audioContext.state === 'suspended') {
+            AppState.audioContext.resume();
+        }
+        // Animate waves
+        document.querySelectorAll('.wave-bar').forEach((bar, i) => {
+            bar.style.animation = `waveform 0.8s ease-in-out infinite`;
+            bar.style.animationDelay = `${(i % 15) * 0.05}s`;
+        });
+    } else {
+        AppState.audioContext.suspend();
+        document.querySelectorAll('.wave-bar').forEach(bar => {
+            bar.style.animation = 'none';
+            bar.style.height = '15px';
+        });
+    }
+    
+    // Update UI
+    const icon = AppState.isPlaying ? 'fa-pause' : 'fa-play';
+    const text = AppState.isPlaying ? 'Pause' : 'Live AI';
+    if (DOM.playIcon) DOM.playIcon.className = `fas ${icon}`;
+    if (DOM.playText) DOM.playText.textContent = text;
+    if (DOM.mobilePlayIcon) DOM.mobilePlayIcon.className = `fas ${icon}-circle text-3xl`;
+    if (DOM.mobilePlayText) DOM.mobilePlayText.textContent = AppState.isPlaying ? 'Pause' : 'Listen';
+}
+
+// =============================================
+// UI UPDATES
+// =============================================
+function updateAIStatus(status, message) {
+    const statusEl = DOM.aiStatus;
+    if (!statusEl) return;
+    
+    const colors = {
+        success: 'text-green-400',
+        warning: 'text-yellow-400',
+        error: 'text-red-400'
+    };
+    
+    statusEl.innerHTML = `
+        <span class="w-2 h-2 rounded-full animate-pulse mr-1.5 
+            ${status === 'success' ? 'bg-green-400' : status === 'warning' ? 'bg-yellow-400' : 'bg-red-400'}">
+        </span>
+        <span class="text-xs font-medium ${colors[status] || 'text-green-400'}">${message || 'AI Active'}</span>
+    `;
+}
+
+function updateAILoading(isLoading) {
+    if (DOM.loadingStatus) {
+        DOM.loadingStatus.textContent = isLoading ? 'Mistral AI inachakata...' : 'Tayari';
+    }
+}
+
+function updateUptime() {
+    const elapsed = Math.floor((Date.now() - AppState.startTime) / 1000);
+    const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+    const seconds = String(elapsed % 60).padStart(2, '0');
+    // Optional: display somewhere
+}
+
+// =============================================
+// DEMO DATA (FALLBACK - AI Style)
+// =============================================
+function loadDemoData() {
+    const demoStories = [
+        {
+            id: 'demo_1',
+            title: 'Waziri Mkuu Kassim Majaliwa Azindua Mpango wa Maendeleo ya Viwanda',
+            category: 'government',
+            published_date: new Date().toISOString(),
+            summary: 'Waziri Mkuu amezindua mpango mpya wa maendeleo ya viwanda nchini Tanzania.',
+            content: 'Waziri Mkuu Kassim Majaliwa leo amezindua mpango mpya wa maendeleo ya viwanda katika ukumbi wa Mwalimu Nyerere jijini Dar es Salaam. Mpango huu unalenga kuongeza uzalishaji wa viwandani kwa asilimia 20 ifikapo mwaka 2026.',
+            source_count: 4,
+            impact_rating: 8,
+            region: 'Dar es Salaam',
+            isAIGenerated: true,
+            source_urls: ['https://ai.taarifa.go.tz/demo/1'],
+            structured_content: { title: 'Mpango wa Maendeleo ya Viwanda', ministry: 'Waziri Mkuu' }
+        },
+        {
+            id: 'demo_2',
+            title: 'Tanzania Yapata Mafanikio Makubwa Katika Sekta ya Kilimo',
+            category: 'breaking',
+            published_date: new Date(Date.now() - 3600000).toISOString(),
+            summary: 'Serikali imetangaza ongezeko la mavuno kwa asilimia 15 mwaka huu.',
+            content: 'Waziri wa Kilimo Hussein Bashe ametangaza mafanikio makubwa katika sekta ya kilimo mwaka huu. Mavuno ya msimu yameongezeka kwa asilimia 15 ikilinganishwa na mwaka jana. Hii ni hatua kubwa katika kuhakikisha usalama wa chakula nchini.',
+            source_count: 6,
+            impact_rating: 9,
+            region: 'Dodoma',
+            isAIGenerated: true,
+            source_urls: ['https://ai.taarifa.go.tz/demo/2']
+        },
+        {
+            id: 'demo_3',
+            title: 'Maadhimisho ya Siku ya Wanawake Yafanyika Mkoani Arusha',
+            category: 'events',
+            published_date: new Date(Date.now() - 7200000).toISOString(),
+            summary: 'Maadhimisho ya Siku ya Wanawake yamefanyika mkoani Arusha kwa shughuli mbalimbali.',
+            content: 'Maadhimisho ya Siku ya Wanawake yamefanyika mkoani Arusha leo. Mkurugenzi wa Mkoa, Bi. Amina Mohamed, amewahimiza wanawake kushiriki kikamilifu katika maendeleo ya nchi. Tamasha hili limehudhuriwa na maelfu ya wanawake kutoka mikoa jirani.',
+            source_count: 3,
+            impact_rating: 6,
+            region: 'Arusha',
+            isAIGenerated: true,
+            source_urls: ['https://ai.taarifa.go.tz/demo/3']
+        }
+    ];
+    
+    AppState.stories = demoStories;
+    AppState.storyCount = demoStories.length;
+    
+    if (DOM.storyCount) {
+        DOM.storyCount.textContent = demoStories.length;
+    }
+    if (DOM.lastCrawl) {
+        DOM.lastCrawl.textContent = new Date().toLocaleTimeString('sw-TZ');
+    }
+    
+    renderContent(demoStories);
+}
+
+// =============================================
+// EXPOSE GLOBAL FUNCTIONS
+// =============================================
+window.fetchAINews = fetchAINews;
+window.switchCategory = switchCategory;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.toggleAudio = toggleAudio;
+window.renderContent = renderContent;
+
+console.log('✅ AI Engine functions exposed globally');
+console.log('🤖 Mistral AI API Key:', AI_CONFIG.apiKey ? '✓ Configured' : '✗ Missing');
+console.log('📡 API URL:', AI_CONFIG.apiUrl);
+console.log('🧠 Model:', AI_CONFIG.model);
