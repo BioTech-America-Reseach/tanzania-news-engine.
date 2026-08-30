@@ -1,0 +1,7 @@
+# robots.txt
+User-agent: *
+Allow: /
+Disallow: /assets/
+Disallow: /api/
+
+Sitemap: https://taarifatanzania.com/sitemap.xml

@@ -1,981 +1,854 @@
-// ================================================================
-// TANZANIA AI NEWS ENGINE - APP.JS
-// Vyombo Vyote vya Habari (TV, Radio, Blog, News, RSS, Government)
-// ================================================================
+// =============================================
+// TANZANIA NEWS ENGINE - APPLICATION LOGIC
+// =============================================
 
-// ================================================================
+// =============================================
 // CONFIGURATION
-// ================================================================
+// =============================================
 const CONFIG = {
+    // API Endpoints
+    apiUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:8080/api'
+        : 'https://api.taarifatanzania.com/api',
+    
+    wsUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'ws://localhost:8081/live-audio'
+        : 'wss://api.taarifatanzania.com/live-audio',
+    
     // Mistral AI Configuration
-    apiKey: '3pDTfrhKfqKtLyrKVwyMhC5A2xd7sv0C',
-    apiUrl: 'https://api.mistral.ai/v1/chat/completions',
-    model: 'mistral-large-latest',
+    mistralApiKey: '3pDTfrhKfqKtLyrKVwyMhC5A2xd7sv0C',
+    mistralApiUrl: 'https://api.mistral.ai/v1/chat/completions',
+    mistralModel: 'mistral-large-latest',
     
-    // Refresh interval: 60 seconds (Dakika 1)
-    refreshInterval: 60000,
+    // Refresh intervals
+    contentRefreshInterval: 60000, // 1 minute
+    statusRefreshInterval: 5000,   // 5 seconds
     
-    // Maximum stories to keep
-    maxStories: 120,
-    
-    // Total sources being monitored
-    totalSources: 9000
+    // Maximum items per page
+    itemsPerPage: 25
 };
 
-// ================================================================
+// =============================================
 // APPLICATION STATE
-// ================================================================
-const state = {
-    // All stories
-    allStories: [],
+// =============================================
+const AppState = {
+    // Current state
+    currentCategory: 'all',
+    currentPage: 1,
+    stories: [],
     filteredStories: [],
     
-    // Current filters
-    currentCategory: 'all',
-    currentSource: 'all',
+    // Audio state
+    audioContext: null,
+    audioBuffer: [],
+    isPlaying: false,
+    audioSource: null,
+    audioGain: null,
     
-    // Loading state
-    isFetching: false,
+    // WebSocket
+    wsConnection: null,
+    isConnected: false,
     
-    // Deduplication
-    storyIds: new Set(),
+    // System stats
+    activeUsers: 0,
+    storyCount: 0,
+    startTime: Date.now(),
     
-    // Counts
-    counts: {
-        tv: 0,
-        radio: 0,
-        blog: 0,
-        news: 0,
-        rss: 0,
-        gov: 0,
-        total: 0
-    },
-    
-    categoryCounts: {
-        vikao: 0,
-        ratiba: 0,
-        matukio: 0,
-        breaking: 0,
-        biashara: 0,
-        afya: 0,
-        michezo: 0,
-        tech: 0,
-        general: 0
-    },
-    
-    // Last fetch time
-    lastFetchTime: null,
-    seenCount: 0
+    // Loading states
+    isLoading: false,
+    hasMore: true
 };
 
-// ================================================================
-// DOM REFERENCES
-// ================================================================
+// =============================================
+// DOM REFERENCES (Cached for performance)
+// =============================================
 const DOM = {
-    feed: document.getElementById('newsContainer'),
-    loadingState: document.getElementById('loadingState'),
-    aiStatusMsg: document.getElementById('aiStatusMsg'),
-    lastUpdate: document.getElementById('lastUpdate'),
-    tickerLive: document.getElementById('tickerLive'),
-    modalOverlay: document.getElementById('modalOverlay'),
-    modalContent: document.getElementById('modalContent'),
-    scrollBtn: document.getElementById('scrollTopBtn'),
-    refreshBtn: document.getElementById('refreshBtn'),
+    feed: document.getElementById('contentFeed'),
+    storyCount: document.getElementById('storyCount'),
+    sourceCount: document.getElementById('sourceCount'),
+    lastCrawl: document.getElementById('lastCrawl'),
+    uptime: document.getElementById('uptime'),
+    activeUsers: document.getElementById('activeUsers'),
+    connectionStatus: document.getElementById('connectionStatus'),
+    tickerText: document.getElementById('tickerText'),
     
-    // Stats
-    countTV: document.getElementById('countTV'),
-    countRadio: document.getElementById('countRadio'),
-    countBlog: document.getElementById('countBlog'),
-    countTotal: document.getElementById('countTotal'),
+    // Audio controls
+    playIcon: document.getElementById('playIcon'),
+    playText: document.getElementById('playText'),
+    mobilePlayIcon: document.getElementById('mobilePlayIcon'),
+    mobilePlayText: document.getElementById('mobilePlayText'),
     
-    // Category counts
-    countAllCat: document.getElementById('countAllCat'),
-    countVikaoCat: document.getElementById('countVikaoCat'),
-    countRatibaCat: document.getElementById('countRatibaCat'),
-    countMatukioCat: document.getElementById('countMatukioCat'),
-    countBreakingCat: document.getElementById('countBreakingCat'),
-    
-    // Source count display
-    sourceCountDisplay: document.getElementById('sourceCountDisplay')
+    // Modal
+    modal: document.getElementById('detailModal'),
+    modalTitle: document.getElementById('modalTitle'),
+    modalContent: document.getElementById('modalContent')
 };
 
-// ================================================================
-// SYSTEM PROMPT - VYOMBO VYOTE VYA HABARI
-// ================================================================
-const SYSTEM_PROMPT = `
-Wewe ni mhariri mkuu wa habari za Tanzania unayefuatilia VYOMBO VYOTE VYA HABARI nchini.
-
-**VYOMBO UNAVYOFUATILIA:**
-
-1. **TV CHANNELS (Televisheni)**
-   - Azam TV, Clouds TV, ITV, TBC 1, EATV, Star TV, Capital TV, n.k.
-
-2. **RADIO STATIONS (Redio)**
-   - Radio One, Clouds FM, Times FM, TBC FM, BBC Swahili, n.k.
-
-3. **ONLINE NEWS OUTLETS (Magazeti mtandaoni)**
-   - Mwananchi, The Citizen, Daily News, IPP Media, n.k.
-
-4. **BLOGS (Mablogu)**
-   - Mablogu yote ya Tanzania yanayotoa habari
-
-5. **RSS FEEDS (Mlisho wa habari)**
-   - Mlisho wote wa habari kutoka vyanzo mbalimbali
-
-6. **GOVERNMENT WEBSITES (Tovuti za Serikali)**
-   - Tovuti zote za serikali Tanzania (400+)
-
-**AINA ZA TAARIFA:**
-- VIKAO VYA SERIKALI (Government Meetings)
-- RATIBA ZA SERIKALI (Government Schedules)
-- MATUKIO NA SHUGHULI (Events & Activities)
-- BREAKING NEWS (Habari za Dharura)
-- BIASHARA NA UCHUMI (Business & Economy)
-- AFYA NA HUDUMA (Health & Services)
-- MICHEZO NA BURUDANI (Sports & Entertainment)
-- TEKNOLOJIA (Technology)
-
-**MUHIMU:**
-- Taarifa zote ziwe za ndani ya SAA 24 ZILIZOPITA
-- Toa taarifa 10-12 kwa kila ombi
-- Hakikisha unaonyesha CHANZO (TV, Radio, Blog, News, RSS, Gov)
-- Kila taarifa iwe na: Kichwa, Muhtasari, Maelezo, Tarehe, Mkoa, Athari (1-10)
-
-**FORMAT:**
-Toa taarifa kwa lugha ya Kiswahili sanifu.
-`;
-
-// ================================================================
-// USER PROMPT
-// ================================================================
-function getUserPrompt() {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('sw-TZ', { hour: '2-digit', minute: '2-digit' });
-    const dateStr = now.toLocaleDateString('sw-TZ', { day: 'numeric', month: 'long', year: 'numeric' });
+// =============================================
+// INITIALIZATION
+// =============================================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 Tanzania News Engine v2.0 initialized');
     
-    return `
-Tafadhali nipe taarifa zote muhimu za Tanzania kwa saa hii (${timeStr}, tarehe ${dateStr}).
-
-Natafuta taarifa kutoka:
-1. TV Channels (Televisheni) - Azam, Clouds, ITV, TBC, EATV
-2. Radio Stations - Radio One, Clouds FM, Times FM, TBC FM
-3. Online News - Mwananchi, The Citizen, Daily News, IPP
-4. Blogs - Mablogu yote ya Tanzania
-5. RSS Feeds - Mlisho wote wa habari
-6. Government - Tovuti zote za serikali
-
-Taarifa ziwe za ndani ya masaa 24 yaliyopita. Toa taarifa 12 muhimu zaidi.
-`;
-}
-
-// ================================================================
-// FETCH ALL NEWS FROM MISTRAL AI
-// ================================================================
-async function fetchAllNews() {
-    if (state.isFetching) return;
-    
-    state.isFetching = true;
-    
-    // Update button
-    if (DOM.refreshBtn) {
-        DOM.refreshBtn.disabled = true;
-        DOM.refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Inatafuta...';
+    // Set source count
+    if (DOM.sourceCount) {
+        DOM.sourceCount.textContent = '10,400+';
     }
     
-    // Show loading if no stories
-    if (state.allStories.length === 0 && DOM.loadingState) {
-        DOM.loadingState.style.display = 'block';
-        DOM.feed.innerHTML = '';
-    }
+    // Load initial content
+    fetchContent('all');
     
-    if (DOM.aiStatusMsg) {
-        DOM.aiStatusMsg.textContent = 'Mistral AI inachakata vyombo 9,000+ vya habari...';
+    // Setup WebSocket connection
+    initWebSocket();
+    
+    // Start periodic updates
+    setInterval(() => {
+        fetchContent(AppState.currentCategory);
+    }, CONFIG.contentRefreshInterval);
+    
+    // Update uptime every second
+    setInterval(updateUptime, 1000);
+    
+    // Update connection status
+    setInterval(updateConnectionStatus, CONFIG.statusRefreshInterval);
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+        if (e.key === ' ' || e.key === 'Space') {
+            e.preventDefault();
+            toggleAudio();
+        }
+    });
+    
+    // Log performance
+    console.log(`✅ App loaded in ${performance.now().toFixed(0)}ms`);
+});
+
+// =============================================
+// CONTENT FETCHING
+// =============================================
+async function fetchContent(category = 'all', page = 1) {
+    // Prevent multiple simultaneous requests
+    if (AppState.isLoading) return;
+    
+    AppState.isLoading = true;
+    AppState.currentCategory = category;
+    AppState.currentPage = page;
+    
+    // Show loading state
+    if (page === 1) {
+        DOM.feed.innerHTML = `
+            <div class="text-center py-8">
+                <i class="fas fa-spinner fa-spin text-3xl text-blue-600 mb-3"></i>
+                <p class="text-gray-500">Loading latest updates...</p>
+            </div>
+        `;
     }
     
     try {
-        const response = await fetch(CONFIG.apiUrl, {
-            method: 'POST',
+        // Try to fetch from API
+        const endpoint = category === 'all' 
+            ? `${CONFIG.apiUrl}/content/recent`
+            : `${CONFIG.apiUrl}/content/category/${category}`;
+        
+        const response = await fetch(`${endpoint}?page=${page}&limit=${CONFIG.itemsPerPage}`, {
             headers: {
-                'Authorization': `Bearer ${CONFIG.apiKey}`,
+                'Accept': 'application/json',
                 'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: CONFIG.model,
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    { role: 'user', content: getUserPrompt() }
-                ],
-                temperature: 0.3,
-                max_tokens: 1800
-            })
+            }
         });
         
         if (!response.ok) {
-            throw new Error(`API Error: ${response.status} - ${response.statusText}`);
+            throw new Error(`API error: ${response.status}`);
         }
         
         const data = await response.json();
-        const aiText = data.choices[0].message.content;
         
-        // Parse AI response
-        const newStories = parseAIStories(aiText);
-        
-        if (newStories && newStories.length > 0) {
-            let addedCount = 0;
-            
-            for (const story of newStories) {
-                // Create unique ID from title
-                const storyId = story.title.toLowerCase().replace(/[^a-z0-9]/g, '');
-                
-                // Check if already exists
-                if (!state.storyIds.has(storyId)) {
-                    state.storyIds.add(storyId);
-                    story.id = storyId;
-                    story.timestamp = new Date().toISOString();
-                    state.allStories.unshift(story);
-                    addedCount++;
-                }
-            }
-            
-            // Limit stories
-            if (state.allStories.length > CONFIG.maxStories) {
-                state.allStories = state.allStories.slice(0, CONFIG.maxStories);
-            }
-            
-            state.seenCount += addedCount;
-            state.lastFetchTime = new Date();
-            
-            // Update everything
-            updateAllCounts();
-            renderNews();
-            updateTicker();
-            
-            if (DOM.aiStatusMsg) {
-                DOM.aiStatusMsg.textContent = `✅ Taarifa ${addedCount} mpya zimeingia! (TV: ${state.counts.tv}, Radio: ${state.counts.radio}, Blog: ${state.counts.blog}, News: ${state.counts.news}, RSS: ${state.counts.rss}, Gov: ${state.counts.gov})`;
-            }
+        // Update stories
+        if (page === 1) {
+            AppState.stories = data.items || [];
         } else {
-            if (DOM.aiStatusMsg) {
-                DOM.aiStatusMsg.textContent = '⚠️ Hakuna taarifa mpya. Jaribu tena.';
-            }
+            AppState.stories = [...AppState.stories, ...(data.items || [])];
         }
+        
+        AppState.hasMore = data.hasMore || false;
+        AppState.storyCount = data.total || AppState.stories.length;
+        
+        // Update DOM
+        if (DOM.storyCount) {
+            DOM.storyCount.textContent = AppState.storyCount.toLocaleString();
+        }
+        
+        if (DOM.lastCrawl) {
+            DOM.lastCrawl.textContent = new Date().toLocaleTimeString('sw-TZ');
+        }
+        
+        // Render stories
+        renderContent(AppState.stories);
         
     } catch (error) {
-        console.error('❌ AI Fetch Error:', error);
+        console.error('Error fetching content:', error);
         
-        if (DOM.aiStatusMsg) {
-            DOM.aiStatusMsg.textContent = `❌ Hitilafu: ${error.message}`;
+        // Fallback to demo data if API fails
+        if (page === 1) {
+            loadDemoData();
         }
-        
-        // Load demo data if no stories
-        if (state.allStories.length === 0) {
-            loadDemoNews();
-        }
-        
     } finally {
-        state.isFetching = false;
-        
-        // Hide loading
-        if (DOM.loadingState) {
-            DOM.loadingState.style.display = 'none';
-        }
-        
-        // Reset button
-        if (DOM.refreshBtn) {
-            DOM.refreshBtn.disabled = false;
-            DOM.refreshBtn.innerHTML = '<i class="fas fa-sync-alt mr-1"></i> Sasa';
-        }
-        
-        // Update last fetch time
-        if (state.lastFetchTime && DOM.lastUpdate) {
-            DOM.lastUpdate.textContent = state.lastFetchTime.toLocaleTimeString('sw-TZ');
-        }
+        AppState.isLoading = false;
     }
 }
 
-// ================================================================
-// PARSE AI RESPONSE
-// ================================================================
-function parseAIStories(text) {
-    try {
-        // Try JSON first
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            try {
-                const parsed = JSON.parse(jsonMatch[0]);
-                let items = parsed.stories || parsed.items || parsed.news || [];
-                if (Array.isArray(items) && items.length > 0) {
-                    return items.map(item => ({
-                        title: item.title || item.kichwa || 'Taarifa mpya',
-                        summary: item.summary || item.muhtasari || item.content || '',
-                        category: item.category || item.aina || 'general',
-                        source: item.source || item.chanzo || 'news',
-                        impact: item.impact || item.athari || 5,
-                        region: item.region || item.mkoa || 'Tanzania',
-                        content: item.content || item.maelezo || item.summary || '',
-                        sourceName: item.sourceName || item.jina_chanzo || ''
-                    }));
-                }
-            } catch (e) {
-                // Not valid JSON, continue with text parsing
-            }
-        }
-        
-        // Parse from text
-        const stories = [];
-        const lines = text.split('\n').filter(l => l.trim());
-        let current = null;
-        
-        // Source mapping
-        const sourceMap = {
-            'azam': 'tv', 'clouds tv': 'tv', 'itv': 'tv', 'tbc 1': 'tv', 'eatv': 'tv',
-            'star tv': 'tv', 'capital tv': 'tv',
-            'radio one': 'radio', 'clouds fm': 'radio', 'times fm': 'radio', 'tbc fm': 'radio',
-            'bbc swahili': 'radio',
-            'mwananchi': 'news', 'citizen': 'news', 'daily news': 'news', 'ipp media': 'news',
-            'blog': 'blog', 'blogs': 'blog',
-            'rss': 'rss', 'feed': 'rss',
-            'serikali': 'gov', 'government': 'gov', 'tovuti': 'gov'
-        };
-        
-        for (const line of lines) {
-            const trimmed = line.trim();
-            
-            // Numbered items: 1. Title
-            const numMatch = trimmed.match(/^(\d+)[\.\)]\s*(.+)/);
-            if (numMatch) {
-                if (current) stories.push(current);
-                current = {
-                    title: numMatch[2].trim(),
-                    summary: '',
-                    category: 'general',
-                    source: 'news',
-                    impact: 5,
-                    region: 'Tanzania',
-                    content: '',
-                    sourceName: ''
-                };
-                continue;
-            }
-            
-            // Bold titles: **TITLE** or ALL CAPS
-            if (trimmed.match(/^\*\*.+\*\*/) || trimmed.match(/^[A-Z][A-Z\s]{3,}/)) {
-                if (current) stories.push(current);
-                current = {
-                    title: trimmed.replace(/\*\*/g, '').trim(),
-                    summary: '',
-                    category: 'general',
-                    source: 'news',
-                    impact: 5,
-                    region: 'Tanzania',
-                    content: '',
-                    sourceName: ''
-                };
-                continue;
-            }
-            
-            // Add to current story
-            if (current) {
-                const lower = trimmed.toLowerCase();
-                
-                // Detect source
-                if (lower.includes('source') || lower.includes('chanzo') || lower.includes('kutoka')) {
-                    const parts = trimmed.split(':');
-                    if (parts.length > 1) {
-                        const srcText = parts[1].trim().toLowerCase();
-                        let found = false;
-                        for (const [key, val] of Object.entries(sourceMap)) {
-                            if (srcText.includes(key)) {
-                                current.source = val;
-                                current.sourceName = parts[1].trim();
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (!found) {
-                            current.sourceName = parts[1].trim();
-                        }
-                    }
-                }
-                // Detect category
-                else if (lower.includes('category') || lower.includes('aina') || lower.includes('habari')) {
-                    const parts = trimmed.split(':');
-                    if (parts.length > 1) {
-                        const cat = parts[1].trim().toLowerCase();
-                        const map = {
-                            'vikao': 'vikao',
-                            'government meeting': 'vikao',
-                            'ratiba': 'ratiba',
-                            'schedule': 'ratiba',
-                            'matukio': 'matukio',
-                            'event': 'matukio',
-                            'breaking': 'breaking',
-                            'dharura': 'breaking',
-                            'biashara': 'biashara',
-                            'business': 'biashara',
-                            'afya': 'afya',
-                            'health': 'afya',
-                            'michezo': 'michezo',
-                            'sports': 'michezo',
-                            'tech': 'tech',
-                            'technology': 'tech'
-                        };
-                        current.category = map[cat] || cat || 'general';
-                    }
-                }
-                // Detect impact
-                else if (lower.includes('impact') || lower.includes('athari')) {
-                    const parts = trimmed.split(':');
-                    if (parts.length > 1) {
-                        const num = parseInt(parts[1].trim());
-                        if (!isNaN(num)) current.impact = Math.min(10, Math.max(1, num));
-                    }
-                }
-                // Detect region
-                else if (lower.includes('region') || lower.includes('mkoa')) {
-                    const parts = trimmed.split(':');
-                    if (parts.length > 1) current.region = parts[1].trim();
-                }
-                // Add to summary or content
-                else {
-                    if (!current.summary) {
-                        current.summary = trimmed;
-                    } else if (current.summary.length < 200) {
-                        current.summary += ' ' + trimmed;
-                    } else {
-                        current.content = (current.content || '') + ' ' + trimmed;
-                    }
-                }
-            }
-        }
-        
-        if (current) stories.push(current);
-        
-        // Filter out stories without title
-        return stories.filter(s => s.title && s.title.length > 5);
-        
-    } catch (error) {
-        console.error('Parse error:', error);
-        return [];
-    }
-}
-
-// ================================================================
-// UPDATE ALL COUNTS
-// ================================================================
-function updateAllCounts() {
-    // Reset counts
-    const counts = { tv: 0, radio: 0, blog: 0, news: 0, rss: 0, gov: 0 };
-    const catCounts = { vikao: 0, ratiba: 0, matukio: 0, breaking: 0, biashara: 0, afya: 0, michezo: 0, tech: 0, general: 0 };
+// =============================================
+// RENDER CONTENT
+// =============================================
+function renderContent(stories) {
+    if (!DOM.feed) return;
     
-    // Count stories
-    for (const story of state.allStories) {
-        const src = story.source || 'news';
-        if (counts[src] !== undefined) counts[src]++;
-        else counts.news++;
-        
-        const cat = story.category || 'general';
-        if (catCounts[cat] !== undefined) catCounts[cat]++;
-        else catCounts.general++;
-    }
-    
-    counts.total = state.allStories.length;
-    state.counts = counts;
-    state.categoryCounts = catCounts;
-    
-    // Update stat displays
-    if (DOM.countTV) DOM.countTV.textContent = counts.tv;
-    if (DOM.countRadio) DOM.countRadio.textContent = counts.radio;
-    if (DOM.countBlog) DOM.countBlog.textContent = counts.blog;
-    if (DOM.countTotal) DOM.countTotal.textContent = counts.total;
-    
-    // Update category counts
-    if (DOM.countAllCat) DOM.countAllCat.textContent = counts.total;
-    if (DOM.countVikaoCat) DOM.countVikaoCat.textContent = catCounts.vikao;
-    if (DOM.countRatibaCat) DOM.countRatibaCat.textContent = catCounts.ratiba;
-    if (DOM.countMatukioCat) DOM.countMatukioCat.textContent = catCounts.matukio;
-    if (DOM.countBreakingCat) DOM.countBreakingCat.textContent = catCounts.breaking;
-    
-    // Update source count display
-    if (DOM.sourceCountDisplay) {
-        DOM.sourceCountDisplay.textContent = `${CONFIG.totalSources.toLocaleString()}+ vyanzo`;
-    }
-}
-
-// ================================================================
-// RENDER NEWS
-// ================================================================
-function renderNews() {
-    let stories = state.allStories;
-    
-    // Filter by source
-    if (state.currentSource !== 'all') {
-        stories = stories.filter(s => (s.source || 'news') === state.currentSource);
-    }
-    
-    // Filter by category
-    if (state.currentCategory !== 'all') {
-        stories = stories.filter(s => (s.category || 'general') === state.currentCategory);
-    }
-    
-    state.filteredStories = stories;
-    
-    if (stories.length === 0) {
-        if (DOM.feed) {
-            DOM.feed.innerHTML = `
-                <div class="text-center py-12 text-gray-500">
-                    <i class="fas fa-inbox text-4xl mb-3 block text-gray-300"></i>
-                    <p class="font-medium">Hakuna taarifa za aina hii</p>
-                    <p class="text-sm text-gray-400">Jaribu kubadilisha chujio au bonyeza "Sasa"</p>
-                    <button onclick="fetchAllNews()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-full text-sm font-semibold hover:bg-blue-700 transition">
-                        <i class="fas fa-sync-alt mr-1"></i> Jaribu tena
-                    </button>
-                </div>
-            `;
-        }
+    if (!stories || stories.length === 0) {
+        DOM.feed.innerHTML = `
+            <div class="text-center text-gray-500 py-12">
+                <i class="fas fa-inbox text-5xl mb-4 block text-gray-300"></i>
+                <p class="text-lg font-medium">No stories available</p>
+                <p class="text-sm">Try refreshing or check back later</p>
+            </div>
+        `;
         return;
     }
     
     // Build HTML
     const html = stories.map((story, index) => {
-        const cat = story.category || 'general';
-        const src = story.source || 'news';
-        const isNew = index < 5;
-        const timeAgo = getTimeAgo(story.timestamp);
-        const isBreaking = cat === 'breaking' || story.impact >= 8;
-        
-        // Source badge
-        const srcBadgeMap = {
-            'tv': '<span class="badge-tv"><i class="fas fa-tv mr-0.5"></i>TV</span>',
-            'radio': '<span class="badge-radio"><i class="fas fa-radio mr-0.5"></i>RADIO</span>',
-            'blog': '<span class="badge-blog"><i class="fas fa-blog mr-0.5"></i>BLOG</span>',
-            'news': '<span class="badge-news"><i class="fas fa-newspaper mr-0.5"></i>NEWS</span>',
-            'rss': '<span class="badge-rss"><i class="fas fa-rss mr-0.5"></i>RSS</span>',
-            'gov': '<span class="badge-gov"><i class="fas fa-landmark mr-0.5"></i>GOV</span>'
-        };
-        const srcBadge = srcBadgeMap[src] || srcBadgeMap.news;
-        
-        // Category badge
-        const catBadgeMap = {
-            'vikao': '<span class="badge-vikao">VIKAO</span>',
-            'ratiba': '<span class="badge-ratiba">RATIBA</span>',
-            'matukio': '<span class="badge-matukio">MATUKIO</span>',
-            'breaking': '<span class="badge-breaking">BREAKING</span>',
-            'biashara': '<span class="badge-news" style="background:#10b981;">BIASHARA</span>',
-            'afya': '<span class="badge-news" style="background:#22c55e;">AFYA</span>',
-            'michezo': '<span class="badge-radio" style="background:#8b5cf6;">MICHEZO</span>',
-            'tech': '<span class="badge-tv" style="background:#06b6d4;">TECH</span>'
-        };
-        const catBadge = catBadgeMap[cat] || '';
-        
-        // Card class
-        let cardClass = `source-${src}`;
-        if (isBreaking) cardClass += ' breaking';
+        const category = story.category || story.content_type || 'General';
+        const categoryColor = getCategoryColor(category);
+        const categoryIcon = getCategoryIcon(category);
+        const isBreaking = category.toLowerCase().includes('breaking');
         
         return `
-            <div class="news-card ${cardClass}" onclick="openModal('${story.id}')">
-                <div class="meta">
-                    ${srcBadge}
-                    ${catBadge}
-                    ${isNew ? '<span class="badge-new">🆕 MPYA</span>' : ''}
-                    <span class="time"><i class="far fa-clock mr-0.5"></i>${timeAgo}</span>
-                </div>
-                <div class="title">${escapeHtml(story.title)}</div>
-                <div class="summary">${escapeHtml(story.summary || '')}</div>
-                <div class="footer">
-                    ${story.sourceName ? `<span><i class="fas fa-broadcast"></i>${escapeHtml(story.sourceName)}</span>` : ''}
-                    <span><i class="fas fa-map-marker-alt"></i>${escapeHtml(story.region || 'Tanzania')}</span>
-                    ${story.impact ? `<span><i class="fas fa-exclamation-triangle"></i>${story.impact}/10</span>` : ''}
+            <div class="story-card bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border-l-4 ${categoryColor.border} cursor-pointer transform hover:-translate-y-1"
+                 onclick="openModal('${story.id || index}')"
+                 data-id="${story.id || index}"
+                 data-category="${category}">
+                <div class="p-5">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1 min-w-0">
+                            <!-- Category Badge -->
+                            <div class="flex items-center flex-wrap gap-2 mb-2">
+                                <span class="inline-flex items-center space-x-1 text-xs font-semibold ${categoryColor.bg} ${categoryColor.text} px-3 py-1 rounded-full">
+                                    <i class="fas ${categoryIcon}"></i>
+                                    <span>${formatCategoryName(category)}</span>
+                                </span>
+                                ${isBreaking ? `
+                                    <span class="inline-flex items-center space-x-1 text-xs font-bold bg-red-500 text-white px-3 py-1 rounded-full animate-pulse">
+                                        <i class="fas fa-bolt"></i>
+                                        <span>BREAKING</span>
+                                    </span>
+                                ` : ''}
+                                <span class="text-xs text-gray-400">${formatDate(story.published_date || story.timestamp)}</span>
+                            </div>
+                            
+                            <!-- Title -->
+                            <h3 class="text-lg md:text-xl font-bold text-gray-900 mb-1.5 line-clamp-2">
+                                ${story.title || 'Untitled Story'}
+                            </h3>
+                            
+                            <!-- Summary -->
+                            <p class="text-gray-600 text-sm line-clamp-2 mb-2">
+                                ${story.summary || story.original_text?.substring(0, 150) || story.content?.substring(0, 150) || ''}${(story.summary || story.original_text || story.content || '').length > 150 ? '...' : ''}
+                            </p>
+                            
+                            <!-- Meta Info -->
+                            <div class="flex items-center flex-wrap gap-3 text-xs text-gray-400">
+                                <span class="flex items-center space-x-1">
+                                    <i class="fas fa-link"></i>
+                                    <span>${story.source_count || 1} sources</span>
+                                </span>
+                                ${story.impact_rating ? `
+                                    <span class="flex items-center space-x-1">
+                                        <i class="fas fa-exclamation-triangle text-red-500"></i>
+                                        <span class="font-bold text-red-600">Impact: ${story.impact_rating}/10</span>
+                                    </span>
+                                ` : ''}
+                                ${story.region ? `
+                                    <span class="flex items-center space-x-1">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        <span>${story.region}</span>
+                                    </span>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        <!-- Arrow Indicator -->
+                        <div class="ml-3 flex-shrink-0 self-center">
+                            <i class="fas fa-chevron-right text-gray-300 group-hover:text-blue-600 transition"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
     }).join('');
     
-    if (DOM.feed) {
-        DOM.feed.innerHTML = html;
-    }
+    // Add load more button if there are more stories
+    const loadMoreHtml = AppState.hasMore ? `
+        <div class="text-center py-4">
+            <button onclick="loadMore()" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition shadow-md hover:shadow-lg">
+                <i class="fas fa-plus-circle mr-2"></i> Load More
+            </button>
+        </div>
+    ` : '';
+    
+    DOM.feed.innerHTML = html + loadMoreHtml;
 }
 
-// ================================================================
-// GET TIME AGO
-// ================================================================
-function getTimeAgo(timestamp) {
-    if (!timestamp) return 'Sasa hivi';
+// =============================================
+// LOAD MORE STORIES
+// =============================================
+function loadMore() {
+    if (!AppState.hasMore || AppState.isLoading) return;
+    fetchContent(AppState.currentCategory, AppState.currentPage + 1);
+}
+
+// =============================================
+// CATEGORY HELPERS
+// =============================================
+function getCategoryColor(category) {
+    const colors = {
+        'government': { border: 'border-blue-500', bg: 'bg-blue-100', text: 'text-blue-700' },
+        'government_meeting': { border: 'border-blue-500', bg: 'bg-blue-100', text: 'text-blue-700' },
+        'national_event': { border: 'border-green-500', bg: 'bg-green-100', text: 'text-green-700' },
+        'events': { border: 'border-green-500', bg: 'bg-green-100', text: 'text-green-700' },
+        'breaking_news': { border: 'border-red-500', bg: 'bg-red-100', text: 'text-red-700' },
+        'breaking': { border: 'border-red-500', bg: 'bg-red-100', text: 'text-red-700' },
+        'business': { border: 'border-yellow-500', bg: 'bg-yellow-100', text: 'text-yellow-700' },
+        'health': { border: 'border-teal-500', bg: 'bg-teal-100', text: 'text-teal-700' },
+        'education': { border: 'border-purple-500', bg: 'bg-purple-100', text: 'text-purple-700' },
+        'general': { border: 'border-gray-400', bg: 'bg-gray-100', text: 'text-gray-700' }
+    };
+    return colors[category.toLowerCase()] || colors.general;
+}
+
+function getCategoryIcon(category) {
+    const icons = {
+        'government': 'fa-landmark',
+        'government_meeting': 'fa-landmark',
+        'national_event': 'fa-calendar-check',
+        'events': 'fa-calendar-check',
+        'breaking_news': 'fa-bolt',
+        'breaking': 'fa-bolt',
+        'business': 'fa-chart-line',
+        'health': 'fa-heartbeat',
+        'education': 'fa-graduation-cap',
+        'general': 'fa-newspaper'
+    };
+    return icons[category.toLowerCase()] || icons.general;
+}
+
+function formatCategoryName(category) {
+    const names = {
+        'government': 'Government',
+        'government_meeting': 'Government Meeting',
+        'national_event': 'National Event',
+        'events': 'Events',
+        'breaking_news': 'Breaking News',
+        'breaking': 'Breaking',
+        'business': 'Business',
+        'health': 'Health',
+        'education': 'Education',
+        'general': 'General'
+    };
+    return names[category.toLowerCase()] || category;
+}
+
+// =============================================
+// DATE FORMATTING
+// =============================================
+function formatDate(dateString) {
+    if (!dateString) return 'Just now';
+    
     try {
-        const date = new Date(timestamp);
-        if (isNaN(date.getTime())) return 'Sasa hivi';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Just now';
+        
         const now = new Date();
         const diffMs = now - date;
-        const diffMin = Math.floor(diffMs / 60000);
-        if (diffMin < 1) return 'Dakika hii';
-        if (diffMin < 60) return `${diffMin}m iliyopita`;
+        const diffSec = Math.floor(diffMs / 1000);
+        const diffMin = Math.floor(diffSec / 60);
         const diffHour = Math.floor(diffMin / 60);
-        if (diffHour < 24) return `${diffHour}h iliyopita`;
-        return date.toLocaleDateString('sw-TZ');
-    } catch (e) {
-        return 'Sasa hivi';
-    }
-}
-
-// ================================================================
-// ESCAPE HTML
-// ================================================================
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// ================================================================
-// FILTER FUNCTIONS
-// ================================================================
-function filterSource(source) {
-    state.currentSource = source;
-    
-    // Update source buttons
-    document.querySelectorAll('.source-btn').forEach(btn => {
-        const s = btn.dataset.source;
-        if (s === source) {
-            btn.className = 'source-btn active';
-        } else {
-            btn.className = 'source-btn';
-        }
-    });
-    
-    renderNews();
-}
-
-function filterCategory(category) {
-    state.currentCategory = category;
-    
-    // Update category buttons
-    document.querySelectorAll('.cat-btn').forEach(btn => {
-        const c = btn.dataset.category;
-        if (c === category) {
-            btn.className = 'cat-btn active';
-        } else {
-            btn.className = 'cat-btn';
-        }
-    });
-    
-    renderNews();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// ================================================================
-// UPDATE TICKER
-// ================================================================
-function updateTicker() {
-    if (state.allStories.length > 0 && DOM.tickerLive) {
-        const latest = state.allStories[0];
-        const src = latest.source || 'news';
-        const srcLabel = {
-            tv: 'TV',
-            radio: 'RADIO',
-            blog: 'BLOG',
-            news: 'NEWS',
-            rss: 'RSS',
-            gov: 'GOV'
-        } [src] || 'TAARIFA';
+        const diffDay = Math.floor(diffHour / 24);
         
-        DOM.tickerLive.textContent = `🔴 ${srcLabel}: ${latest.title}`;
+        if (diffSec < 60) return 'Just now';
+        if (diffMin < 60) return `${diffMin}m ago`;
+        if (diffHour < 24) return `${diffHour}h ago`;
+        if (diffDay < 7) return `${diffDay}d ago`;
+        
+        return date.toLocaleDateString('sw-TZ', { 
+            day: 'numeric', 
+            month: 'short', 
+            year: 'numeric' 
+        });
+    } catch (e) {
+        return 'Recently';
     }
 }
 
-// ================================================================
-// MODAL
-// ================================================================
+// =============================================
+// CATEGORY SWITCHING
+// =============================================
+function switchCategory(category) {
+    // Update active tab
+    document.querySelectorAll('.category-tab').forEach(tab => {
+        tab.classList.remove('active', 'bg-blue-600', 'text-white');
+        tab.classList.add('bg-gray-100', 'text-gray-700');
+    });
+    
+    const activeTab = document.querySelector(`[onclick="switchCategory('${category}')"]`);
+    if (activeTab) {
+        activeTab.classList.remove('bg-gray-100', 'text-gray-700');
+        activeTab.classList.add('active', 'bg-blue-600', 'text-white');
+    }
+    
+    // Fetch content for new category
+    AppState.currentCategory = category;
+    AppState.currentPage = 1;
+    fetchContent(category);
+}
+
+// =============================================
+// MODAL FUNCTIONS
+// =============================================
 function openModal(storyId) {
-    const story = state.allStories.find(s => s.id === storyId);
-    if (!story) return;
+    // Find the story
+    const story = AppState.stories.find(s => (s.id || '').toString() === storyId.toString());
+    if (!story) {
+        console.warn('Story not found:', storyId);
+        return;
+    }
     
-    const src = story.source || 'news';
-    const srcLabel = {
-        tv: 'TV',
-        radio: 'RADIO',
-        blog: 'BLOG',
-        news: 'NEWS',
-        rss: 'RSS',
-        gov: 'SERIKALI'
-    } [src] || 'CHANZO';
+    // Set title
+    DOM.modalTitle.textContent = story.title || 'Story Details';
     
-    const srcColor = {
-        tv: '#ef4444',
-        radio: '#f59e0b',
-        blog: '#8b5cf6',
-        news: '#3b82f6',
-        rss: '#22c55e',
-        gov: '#1e293b'
-    } [src] || '#64748b';
+    // Build content
+    const category = story.category || story.content_type || 'General';
+    const categoryColor = getCategoryColor(category);
     
-    const cat = story.category || 'general';
-    const catLabel = {
-        'vikao': 'VIKAO VYA SERIKALI',
-        'ratiba': 'RATIBA ZA SERIKALI',
-        'matukio': 'MATUKIO NA SHUGHULI',
-        'breaking': 'BREAKING NEWS',
-        'biashara': 'BIASHARA NA UCHUMI',
-        'afya': 'AFYA NA HUDUMA',
-        'michezo': 'MICHEZO NA BURUDANI',
-        'tech': 'TEKNOLOJIA',
-        'general': 'TAARIFA'
-    } [cat] || 'TAARIFA';
-    
-    const html = `
-        <div>
-            <span class="modal-source" style="background:${srcColor};color:white;">
-                <i class="fas ${src === 'tv' ? 'fa-tv' : src === 'radio' ? 'fa-radio' : src === 'blog' ? 'fa-blog' : src === 'news' ? 'fa-newspaper' : src === 'rss' ? 'fa-rss' : 'fa-landmark'} mr-1"></i>
-                ${srcLabel}
-            </span>
-            <span class="modal-source" style="background:#64748b;color:white;margin-left:4px;">
-                ${catLabel}
-            </span>
-            <div class="modal-title">${escapeHtml(story.title)}</div>
-            <div class="modal-body">
-                <p>${escapeHtml(story.content || story.summary || 'Hakuna maelezo zaidi.')}</p>
+    let contentHtml = `
+        <div class="space-y-4">
+            <!-- Category and Date -->
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="inline-flex items-center space-x-1 ${categoryColor.bg} ${categoryColor.text} px-3 py-1 rounded-full font-semibold">
+                    <i class="fas ${getCategoryIcon(category)}"></i>
+                    <span>${formatCategoryName(category)}</span>
+                </span>
+                <span class="text-gray-400">•</span>
+                <span class="text-gray-500">${formatDate(story.published_date || story.timestamp)}</span>
+                ${story.region ? `
+                    <span class="text-gray-400">•</span>
+                    <span class="text-gray-500"><i class="fas fa-map-marker-alt mr-1"></i>${story.region}</span>
+                ` : ''}
             </div>
-            <div class="modal-meta">
-                ${story.sourceName ? `<span><i class="fas fa-broadcast"></i> ${escapeHtml(story.sourceName)}</span>` : ''}
-                <span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(story.region || 'Tanzania')}</span>
-                ${story.impact ? `<span><i class="fas fa-exclamation-triangle"></i> Impact: ${story.impact}/10</span>` : ''}
-                <span><i class="far fa-clock"></i> ${new Date(story.timestamp).toLocaleString('sw-TZ')}</span>
+            
+            <!-- Content -->
+            <div class="prose max-w-none">
+                <p class="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    ${story.original_text || story.content || story.summary || 'No details available'}
+                </p>
+            </div>
+    `;
+    
+    // Add structured content if available
+    if (story.structured_content) {
+        const sc = story.structured_content;
+        contentHtml += `
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h4 class="font-bold text-sm text-gray-700 mb-2 flex items-center">
+                    <i class="fas fa-structure text-blue-600 mr-2"></i>
+                    Structured Data
+                </h4>
+                <pre class="text-xs text-gray-600 overflow-x-auto bg-white p-3 rounded border">${JSON.stringify(sc, null, 2)}</pre>
+            </div>
+        `;
+    }
+    
+    // Add sources
+    if (story.source_urls && story.source_urls.length > 0) {
+        contentHtml += `
+            <div>
+                <h4 class="font-bold text-sm text-gray-700 mb-2 flex items-center">
+                    <i class="fas fa-link text-blue-600 mr-2"></i>
+                    Sources (${story.source_urls.length})
+                </h4>
+                <ul class="space-y-1">
+                    ${story.source_urls.map(url => `
+                        <li>
+                            <a href="${url}" target="_blank" rel="noopener noreferrer" 
+                               class="text-blue-600 hover:underline text-sm flex items-center">
+                                <i class="fas fa-external-link-alt text-xs mr-2"></i>
+                                ${url.length > 60 ? url.substring(0, 60) + '...' : url}
+                            </a>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    // Add audio if available
+    if (story.audio_url) {
+        contentHtml += `
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 class="font-bold text-sm text-gray-700 mb-2">
+                    <i class="fas fa-headphones text-blue-600 mr-2"></i>
+                    Audio Broadcast
+                </h4>
+                <audio controls class="w-full">
+                    <source src="${story.audio_url}" type="audio/mpeg">
+                    Your browser does not support audio playback.
+                </audio>
+            </div>
+        `;
+    }
+    
+    // Add metadata
+    contentHtml += `
+            <div class="border-t border-gray-200 pt-3 text-xs text-gray-400 flex flex-wrap gap-3">
+                <span><i class="fas fa-hashtag mr-1"></i>ID: ${story.id || 'N/A'}</span>
+                <span><i class="fas fa-flag mr-1"></i>${story.source_count || 1} sources</span>
+                ${story.impact_rating ? `<span><i class="fas fa-exclamation-triangle mr-1"></i>Impact: ${story.impact_rating}/10</span>` : ''}
             </div>
         </div>
     `;
     
-    if (DOM.modalContent) {
-        DOM.modalContent.innerHTML = html;
-    }
-    if (DOM.modalOverlay) {
-        DOM.modalOverlay.classList.add('active');
-    }
+    DOM.modalContent.innerHTML = contentHtml;
+    
+    // Show modal
+    DOM.modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 }
 
 function closeModal(event) {
     if (event && event.target !== event.currentTarget) return;
-    if (DOM.modalOverlay) {
-        DOM.modalOverlay.classList.remove('active');
-    }
+    DOM.modal.classList.add('hidden');
     document.body.style.overflow = '';
 }
 
-// ================================================================
-// DEMO DATA - VYOMBO VYOTE VYA HABARI
-// ================================================================
-function loadDemoNews() {
-    const now = new Date();
-    const demos = [
-        {
-            id: 'demo1',
-            title: 'Azam TV Yatangaza Mpango Mpya wa Burudani',
-            summary: 'Azam TV imezindua chaneli mpya ya burudani inayoangaziwa wakati wote.',
-            category: 'matukio',
-            source: 'tv',
-            sourceName: 'Azam TV',
-            impact: 6,
-            region: 'Dar es Salaam',
-            timestamp: new Date(now - 1000 * 60 * 5).toISOString(),
-            content: 'Azam TV imezindua chaneli mpya ya burudani inayoangaziwa saa 24. Chaneli hii itaangazia vipindi vya muziki, filamu, na burudani kutoka Tanzania na duniani.'
-        },
-        {
-            id: 'demo2',
-            title: 'Radio One Yatangaza Ratiba Mpya ya Vipindi',
-            summary: 'Radio One imetangaza ratiba mpya ya vipindi vyake kuanzia Jumatatu.',
-            category: 'ratiba',
-            source: 'radio',
-            sourceName: 'Radio One',
-            impact: 4,
-            region: 'Dar es Salaam',
-            timestamp: new Date(now - 1000 * 60 * 15).toISOString(),
-            content: 'Radio One imetangaza ratiba mpya ya vipindi vyake kuanzia Jumatatu. Vipindi vipya vimeongezwa ikiwemo kipindi cha michezo na burudani.'
-        },
-        {
-            id: 'demo3',
-            title: 'Baraza la Mawaziri Lafanya Mkutano Dodoma',
-            summary: 'Baraza la Mawaziri limefanya mkutano wake wa 45 jijini Dodoma.',
-            category: 'vikao',
-            source: 'gov',
-            sourceName: 'Ofisi ya Waziri Mkuu',
-            impact: 8,
-            region: 'Dodoma',
-            timestamp: new Date(now - 1000 * 60 * 25).toISOString(),
-            content: 'Baraza la Mawaziri limefanya mkutano wake wa 45 katika Ikulu ya Nkrumah jijini Dodoma. Mkutano umeongozwa na Waziri Mkuu Kassim Majaliwa.'
-        },
-        {
-            id: 'demo4',
-            title: 'Mwananchi Yachapisha Habari za Uchumi Tanzania',
-            summary: 'Gazeti la Mwananchi limechapisha habari za uchumi ikiwemo mabadiliko ya bei.',
-            category: 'biashara',
-            source: 'news',
-            sourceName: 'Mwananchi',
-            impact: 7,
-            region: 'Dar es Salaam',
-            timestamp: new Date(now - 1000 * 60 * 35).toISOString(),
-            content: 'Gazeti la Mwananchi limechapisha habari za uchumi ikiwemo mabadiliko ya bei za bidhaa na mwelekeo wa soko la fedha nchini.'
-        },
-        {
-            id: 'demo5',
-            title: 'Ajali Kubwa Barabara Yatokea Morogoro',
-            summary: 'Ajali kubwa ya gari imetokea mkoani Morogoro na watu 5 wamefariki.',
-            category: 'breaking',
-            source: 'news',
-            sourceName: 'Clouds Media',
-            impact: 9,
-            region: 'Morogoro',
-            timestamp: new Date(now - 1000 * 60 * 8).toISOString(),
-            content: 'Ajali kubwa ya gari imetokea mkoani Morogoro katika eneo la Mikumi. Watu 5 wamefariki na wengine 12 wamejeruhiwa. Polisi wanachunguza sababu za ajali hiyo.'
-        },
-        {
-            id: 'demo6',
-            title: 'TBC FM Yatangaza Matokeo ya Mechi za Ligi Kuu',
-            summary: 'TBC FM imetangaza matokeo ya mechi za Ligi Kuu Tanzania iliyochezwa mwishoni mwa wiki.',
-            category: 'michezo',
-            source: 'radio',
-            sourceName: 'TBC FM',
-            impact: 5,
-            region: 'Dar es Salaam',
-            timestamp: new Date(now - 1000 * 60 * 45).toISOString(),
-            content: 'TBC FM imetangaza matokeo ya mechi za Ligi Kuu Tanzania iliyochezwa mwishoni mwa wiki. Yanga imeshinda 2-0 dhidi ya Simba katika mechi ya kusisimua.'
-        },
-        {
-            id: 'demo7',
-            title: 'Blogu ya Tech Tanzania Yachapisha Makala Mpya',
-            summary: 'Blogu maarufu ya Tech Tanzania imechapisha makala mpya kuhusu uvumbuzi wa teknolojia nchini.',
-            category: 'tech',
-            source: 'blog',
-            sourceName: 'Tech Tanzania Blog',
-            impact: 5,
-            region: 'Dar es Salaam',
-            timestamp: new Date(now - 1000 * 60 * 55).toISOString(),
-            content: 'Blogu maarufu ya Tech Tanzania imechapisha makala mpya kuhusu uvumbuzi wa teknolojia nchini. Makala inazungumzia mafanikio ya kampuni za teknolojia za Tanzania.'
-        },
-        {
-            id: 'demo8',
-            title: 'Wizara ya Afya Yatoa Onyo la Mafua',
-            summary: 'Wizara ya Afya imetoa onyo kwa wananchi kuhusu mafua yanayoenea mikoa ya Dar na Mwanza.',
-            category: 'afya',
-            source: 'gov',
-            sourceName: 'Wizara ya Afya',
-            impact: 8,
-            region: 'Dar es Salaam',
-            timestamp: new Date(now - 1000 * 60 * 70).toISOString(),
-            content: 'Wizara ya Afya imetoa onyo kwa wananchi kuhusu mafua yanayoenea mikoa ya Dar es Salaam na Mwanza. Wananchi wanashauriwa kuvaa barakoa.'
-        },
-        {
-            id: 'demo9',
-            title: 'ITV Yatangaza Mpango Mpya wa Habari',
-            summary: 'ITV imetangaza mpango mpya wa habari unaoangaziwa kila saa.',
-            category: 'matukio',
-            source: 'tv',
-            sourceName: 'ITV',
-            impact: 6,
-            region: 'Dar es Salaam',
-            timestamp: new Date(now - 1000 * 60 * 90).toISOString(),
-            content: 'ITV imetangaza mpango mpya wa habari unaoangaziwa kila saa. Mpango huu unalenga kuleta taarifa za wakati halisi kwa watazamaji.'
-        },
-        {
-            id: 'demo10',
-            title: 'RSS Feed ya BBC Swahili Yatoa Habari Mpya',
-            summary: 'RSS Feed ya BBC Swahili imetoa habari mpya kuhusu mwenendo wa uchumi Tanzania.',
-            category: 'biashara',
-            source: 'rss',
-            sourceName: 'BBC Swahili RSS',
-            impact: 6,
-            region: 'Tanzania',
-            timestamp: new Date(now - 1000 * 60 * 110).toISOString(),
-            content: 'RSS Feed ya BBC Swahili imetoa habari mpya kuhusu mwenendo wa uchumi Tanzania na mabadiliko ya soko la fedha.'
-        },
-        {
-            id: 'demo11',
-            title: 'Clouds FM Yatangaza Matokeo ya Uchaguzi wa Soka',
-            summary: 'Clouds FM imetangaza matokeo ya uchaguzi wa soka Tanzania.',
-            category: 'michezo',
-            source: 'radio',
-            sourceName: 'Clouds FM',
-            impact: 5,
-            region: 'Dar es Salaam',
-            timestamp: new Date(now - 1000 * 60 * 130).toISOString(),
-            content: 'Clouds FM imetangaza matokeo ya uchaguzi wa soka Tanzania. Wachezaji wapya wamechaguliwa kucheza katika timu ya taifa.'
-        },
-        {
-            id: 'demo12',
-            title: 'Mkutano wa Kamati ya Bunge ya Fedha',
-            summary: 'Kamati ya Bunge ya Fedha imefanya mkutano kujadili bajeti ya mwaka 2025.',
-            category: 'vikao',
-            source: 'gov',
-            sourceName: 'Bunge la Tanzania',
-            impact: 7,
-            region: 'Dodoma',
-            timestamp: new Date(now - 1000 * 60 * 150).toISOString(),
-            content: 'Kamati ya Bunge ya Fedha imefanya mkutano wake jijini Dodoma kujadili bajeti ya mwaka 2025. Viongozi wamejipanga kukutana na wadau mbalimbali.'
-        }
-    ];
-    
-    for (const story of demos) {
-        if (!state.storyIds.has(story.id)) {
-            state.storyIds.add(story.id);
-            state.allStories.push(story);
+// =============================================
+// AUDIO CONTROLS
+// =============================================
+function toggleAudio() {
+    // Create audio context if not exists
+    if (!AppState.audioContext) {
+        try {
+            AppState.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            AppState.audioGain = AppState.audioContext.createGain();
+            AppState.audioGain.gain.value = 1.0;
+            AppState.audioGain.connect(AppState.audioContext.destination);
+        } catch (e) {
+            console.error('Audio context creation failed:', e);
+            return;
         }
     }
     
-    state.seenCount = demos.length;
-    state.lastFetchTime = new Date();
+    AppState.isPlaying = !AppState.isPlaying;
     
-    updateAllCounts();
-    renderNews();
-    updateTicker();
-    
-    if (DOM.lastUpdate) {
-        DOM.lastUpdate.textContent = new Date().toLocaleTimeString('sw-TZ');
-    }
-    if (DOM.aiStatusMsg) {
-        DOM.aiStatusMsg.textContent = `📰 Taarifa kutoka TV, Radio, Blog, News, RSS, na Serikali (${demos.length} taarifa)`;
+    if (AppState.isPlaying) {
+        // Resume audio context
+        if (AppState.audioContext.state === 'suspended') {
+            AppState.audioContext.resume().catch(console.error);
+        }
+        
+        // Update UI
+        updateAudioUI(true);
+        
+        // Generate fake audio data for visualization
+        generateFakeAudio();
+        
+        // Try to connect to WebSocket stream
+        if (AppState.wsConnection && AppState.wsConnection.readyState === WebSocket.OPEN) {
+            // Send play command
+            AppState.wsConnection.send(JSON.stringify({ action: 'play' }));
+        }
+        
+        // Start pulse animation on visualizer
+        document.querySelectorAll('.wave-bar').forEach((bar, i) => {
+            bar.style.animation = `waveform 0.8s ease-in-out infinite`;
+            bar.style.animationDelay = `${i * 0.05}s`;
+        });
+        
+    } else {
+        // Pause
+        if (AppState.audioContext) {
+            AppState.audioContext.suspend().catch(console.error);
+        }
+        
+        updateAudioUI(false);
+        
+        // Stop visualizer animation
+        document.querySelectorAll('.wave-bar').forEach(bar => {
+            bar.style.animation = 'none';
+            bar.style.height = '20px';
+        });
+        
+        // Send pause command if connected
+        if (AppState.wsConnection && AppState.wsConnection.readyState === WebSocket.OPEN) {
+            AppState.wsConnection.send(JSON.stringify({ action: 'pause' }));
+        }
     }
 }
 
-// ================================================================
-// SCROLL BUTTON
-// ================================================================
-window.addEventListener('scroll', () => {
-    if (DOM.scrollBtn) {
-        if (window.scrollY > 300) {
-            DOM.scrollBtn.classList.add('visible');
-        } else {
-            DOM.scrollBtn.classList.remove('visible');
+function updateAudioUI(isPlaying) {
+    const icon = isPlaying ? 'fa-pause' : 'fa-play';
+    const text = isPlaying ? 'Pause' : 'Play Live';
+    
+    if (DOM.playIcon) DOM.playIcon.className = `fas ${icon}`;
+    if (DOM.playText) DOM.playText.textContent = text;
+    if (DOM.mobilePlayIcon) DOM.mobilePlayIcon.className = `fas ${icon}-circle text-3xl`;
+    if (DOM.mobilePlayText) DOM.mobilePlayText.textContent = isPlaying ? 'Pause' : 'Listen';
+}
+
+function generateFakeAudio() {
+    // Simulate audio playback for visualization
+    if (!AppState.isPlaying) return;
+    
+    const bars = document.querySelectorAll('.wave-bar');
+    bars.forEach((bar, i) => {
+        const height = 15 + Math.random() * 45;
+        bar.style.height = `${height}px`;
+    });
+    
+    requestAnimationFrame(generateFakeAudio);
+}
+
+// =============================================
+// WEB SOCKET CONNECTION
+// =============================================
+function initWebSocket() {
+    try {
+        AppState.wsConnection = new WebSocket(CONFIG.wsUrl);
+        
+        AppState.wsConnection.onopen = () => {
+            AppState.isConnected = true;
+            console.log('🔊 WebSocket connected');
+            updateConnectionStatus();
+        };
+        
+        AppState.wsConnection.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            } catch (e) {
+                // Handle binary audio data
+                handleAudioData(event.data);
+            }
+        };
+        
+        AppState.wsConnection.onclose = () => {
+            AppState.isConnected = false;
+            console.log('🔇 WebSocket disconnected, reconnecting...');
+            updateConnectionStatus();
+            setTimeout(initWebSocket, 3000);
+        };
+        
+        AppState.wsConnection.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+        
+    } catch (error) {
+        console.error('Failed to initialize WebSocket:', error);
+        setTimeout(initWebSocket, 5000);
+    }
+}
+
+function handleWebSocketMessage(data) {
+    if (data.type === 'status') {
+        AppState.activeUsers = data.activeClients || 0;
+        if (DOM.activeUsers) {
+            DOM.activeUsers.textContent = AppState.activeUsers.toLocaleString();
+        }
+    } else if (data.type === 'audio') {
+        // Decode and play audio
+        try {
+            const audioData = Uint8Array.from(atob(data.data), c => c.charCodeAt(0));
+            handleAudioData(audioData.buffer);
+        } catch (e) {
+            console.error('Failed to decode audio:', e);
+        }
+    } else if (data.type === 'news') {
+        // Update ticker
+        if (DOM.tickerText && data.text) {
+            DOM.tickerText.textContent = data.text;
         }
     }
-});
+}
 
-// ================================================================
-// KEYBOARD SHORTCUTS
-// ================================================================
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
-    if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey) fetchAllNews();
-});
+function handleAudioData(audioData) {
+    if (!AppState.audioContext || !AppState.isPlaying) return;
+    
+    try {
+        AppState.audioContext.decodeAudioData(audioData, (buffer) => {
+            if (AppState.audioSource) {
+                AppState.audioSource.disconnect();
+            }
+            
+            AppState.audioSource = AppState.audioContext.createBufferSource();
+            AppState.audioSource.buffer = buffer;
+            AppState.audioSource.connect(AppState.audioGain);
+            AppState.audioSource.start();
+            
+            AppState.audioSource.onended = () => {
+                AppState.audioSource = null;
+            };
+        });
+    } catch (error) {
+        console.error('Failed to decode audio:', error);
+    }
+}
 
-// ================================================================
-// INITIALIZATION
-// ================================================================
-console.log('🚀 Tanzania AI News Engine - Vyombo Vyote vya Habari');
-console.log(`📡 Mistral AI configured - Monitoring ${CONFIG.totalSources.toLocaleString()}+ sources`);
-console.log('⏰ Refresh every 60 seconds');
-console.log('📺 TV | 📻 Radio | 📰 News | 📝 Blog | 📡 RSS | 🏛️ Government');
+function updateConnectionStatus() {
+    if (!DOM.connectionStatus) return;
+    
+    if (AppState.isConnected) {
+        DOM.connectionStatus.textContent = '● Connected';
+        DOM.connectionStatus.className = 'text-green-400 text-xs';
+    } else {
+        DOM.connectionStatus.textContent = '● Disconnected';
+        DOM.connectionStatus.className = 'text-red-400 text-xs';
+    }
+}
 
-// Load initial news
-fetchAllNews();
+// =============================================
+// SYSTEM UPTIME
+// =============================================
+function updateUptime() {
+    if (!DOM.uptime) return;
+    
+    const elapsed = Math.floor((Date.now() - AppState.startTime) / 1000);
+    const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+    const seconds = String(elapsed % 60).padStart(2, '0');
+    DOM.uptime.textContent = `${hours}:${minutes}:${seconds}`;
+}
 
-// Auto refresh every 60 seconds
-setInterval(fetchAllNews, CONFIG.refreshInterval);
+// =============================================
+// DEMO DATA (FALLBACK)
+// =============================================
+function loadDemoData() {
+    const demoStories = [
+        {
+            id: '1',
+            title: 'Waziri Mkuu Kassim Majaliwa Afanya Mkutano na Wafanyabiashara',
+            category: 'government',
+            published_date: new Date(Date.now() - 1800000).toISOString(),
+            summary: 'Waziri Mkuu Kassim Majaliwa amefanya mkutano na wafanyabiashara wa nchi kuzungumzia changamoto za biashara na uwekezaji nchini.',
+            original_text: 'Mkutano huo ulifanyika katika ofisi za Waziri Mkuu jijini Dar es Salaam...',
+            source_count: 3,
+            region: 'Dar es Salaam',
+            impact_rating: 7,
+            source_urls: ['https://www.moha.go.tz/news/1', 'https://www.mwananchi.co.tz/news/1'],
+            structured_content: {
+                government_meeting: {
+                    title: 'Mkutano wa Waziri Mkuu na Wafanyabiashara',
+                    ministry_agency: 'Ofisi ya Waziri Mkuu',
+                    date: new Date().toISOString().split('T')[0],
+                    time: '10:00',
+                    venue: 'Dar es Salaam',
+                    agenda_summary: 'Kujadili changamoto za biashara na uwekezaji',
+                    key_attendees: ['Waziri Mkuu Kassim Majaliwa', 'Mkuu wa Mkoa wa Dar']
+                }
+            }
+        },
+        {
+            id: '2',
+            title: 'Tanzania Yapata Mafanikio Makubwa Katika Sekta ya Kilimo',
+            category: 'breaking',
+            published_date: new Date(Date.now() - 3600000).toISOString(),
+            summary: 'Serikali ya Tanzania imetangaza mafanikio makubwa katika mavuno ya msimu huu, ikiwa na ongezeko la asilimia 15.',
+            original_text: 'Waziri wa Kilimo, Hussein Bashe, ametangaza mafanikio makubwa ya sekta ya kilimo mwaka huu...',
+            source_count: 5,
+            region: 'Dodoma',
+            impact_rating: 9,
+            source_urls: ['https://www.mof.go.tz/news/2', 'https://www.ippmedia.com/news/2'],
+            structured_content: {
+                breaking_news: {
+                    impact_rating: 9,
+                    primary_subject: 'Mafanikio ya Kilimo',
+                    swahili_summary: 'Tanzania yapata mafanikio makubwa katika sekta ya kilimo. Mavuno ya mwaka huu yameongezeka kwa asilimia 15. Serikali inatarajia kuendelea kuboresha sekta hii.'
+                }
+            }
+        },
+        {
+            id: '3',
+            title: 'Maadhimisho ya Siku ya Wanawake Mkoa wa Arusha',
+            category: 'events',
+            published_date: new Date(Date.now() - 7200000).toISOString(),
+            summary: 'Mkoa wa Arusha unajiandaa kwa maadhimisho ya Siku ya Wanawake, ikiwa na tamasha na mikutano mbalimbali.',
+            original_text: 'Maadhimisho ya Siku ya Wanawake mkoani Arusha yameanza kwa shughuli mbalimbali...',
+            source_count: 2,
+            region: 'Arusha',
+            source_urls: ['https://www.arusha.go.tz/events/1'],
+            structured_content: {
+                national_event: {
+                    event_name: 'Siku ya Wanawake Arusha',
+                    organizer: 'Serikali ya Mkoa wa Arusha',
+                    region: 'Arusha',
+                    date: new Date().toISOString().split('T')[0],
+                    key_objectives: ['Kuhamasisha wanawake', 'Kujadili changamoto']
+                }
+            }
+        },
+        {
+            id: '4',
+            title: 'Mkutano wa Benki Kuu ya Tanzania na Benki za Biashara',
+            category: 'business',
+            published_date: new Date(Date.now() - 10800000).toISOString(),
+            summary: 'Benki Kuu ya Tanzania imefanya mkutano na benki za biashara kujadili mabadiliko ya sera za fedha.',
+            original_text: 'Mkutano huo ulilenga kujadili mabadiliko ya sera za fedha...',
+            source_count: 4,
+            region: 'Dar es Salaam',
+            impact_rating: 6,
+            source_urls: ['https://www.bot.go.tz/news/1']
+        },
+        {
+            id: '5',
+            title: 'Wizara ya Afya Yatangaza Mpango Mpya wa Kinga ya Ugonjwa wa Moyo',
+            category: 'health',
+            published_date: new Date(Date.now() - 14400000).toISOString(),
+            summary: 'Wizara ya Afya imezindua mpango mpya wa kinga ya ugonjwa wa moyo nchini.',
+            original_text: 'Waziri wa Afya, Ummy Mwalimu, amezindua mpango mpya wa kinga ya ugonjwa wa moyo...',
+            source_count: 3,
+            region: 'Dodoma',
+            source_urls: ['https://www.moh.go.tz/news/1']
+        }
+    ];
+    
+    AppState.stories = demoStories;
+    AppState.storyCount = demoStories.length;
+    
+    if (DOM.storyCount) {
+        DOM.storyCount.textContent = AppState.storyCount.toLocaleString();
+    }
+    
+    renderContent(AppState.stories);
+    console.log('📰 Loaded demo data (fallback mode)');
+}
 
-// ================================================================
-// EXPOSE GLOBALS
-// ================================================================
-window.fetchAllNews = fetchAllNews;
-window.filterSource = filterSource;
-window.filterCategory = filterCategory;
+// =============================================
+// SERVICE WORKER REGISTRATION (PWA)
+// =============================================
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('📱 Service Worker registered'))
+        .catch(err => console.error('Service Worker registration failed:', err));
+}
+
+// =============================================
+// EXPOSE GLOBAL FUNCTIONS
+// =============================================
+window.switchCategory = switchCategory;
 window.openModal = openModal;
 window.closeModal = closeModal;
+window.toggleAudio = toggleAudio;
+window.loadMore = loadMore;
+window.fetchContent = fetchContent;
 
-console.log('✅ Engine running - Vyombo 9,000+ vikifuatiliwa kwa wakati halisi');
+console.log('✅ App functions exposed globally');

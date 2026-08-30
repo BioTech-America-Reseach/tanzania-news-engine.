@@ -1,0 +1,51 @@
+{
+  "appName": "Taarifa Tanzania",
+  "version": "2.0.0",
+  "environment": "production",
+  "api": {
+    "mistral": {
+      "apiKey": "3pDTfrhKfqKtLyrKVwyMhC5A2xd7sv0C",
+      "apiUrl": "https://api.mistral.ai/v1/chat/completions",
+      "model": "mistral-large-latest",
+      "maxTokens": 1800,
+      "temperature": 0.3
+    }
+  },
+  "refresh": {
+    "interval": 60000,
+    "maxStories": 120
+  },
+  "sources": {
+    "total": 9200,
+    "categories": {
+      "tv": { "count": 45, "icon": "fa-tv", "color": "#ef4444" },
+      "radio": { "count": 120, "icon": "fa-radio", "color": "#f59e0b" },
+      "news": { "count": 350, "icon": "fa-newspaper", "color": "#3b82f6" },
+      "blog": { "count": 4500, "icon": "fa-blog", "color": "#8b5cf6" },
+      "rss": { "count": 3800, "icon": "fa-rss", "color": "#22c55e" },
+      "gov": { "count": 420, "icon": "fa-landmark", "color": "#1e293b" }
+    }
+  },
+  "categories": {
+    "vikao": { "name": "Vikao vya Serikali", "icon": "fa-landmark", "color": "#3b82f6" },
+    "ratiba": { "name": "Ratiba za Serikali", "icon": "fa-calendar-alt", "color": "#8b5cf6" },
+    "matukio": { "name": "Matukio na Shughuli", "icon": "fa-calendar-check", "color": "#f59e0b" },
+    "breaking": { "name": "Breaking News", "icon": "fa-bolt", "color": "#ef4444" },
+    "biashara": { "name": "Biashara na Uchumi", "icon": "fa-chart-line", "color": "#10b981" },
+    "afya": { "name": "Afya na Huduma", "icon": "fa-heartbeat", "color": "#22c55e" },
+    "michezo": { "name": "Michezo na Burudani", "icon": "fa-futbol", "color": "#8b5cf6" },
+    "tech": { "name": "Teknolojia", "icon": "fa-microchip", "color": "#06b6d4" }
+  },
+  "ui": {
+    "theme": "light",
+    "primaryColor": "#3b82f6",
+    "secondaryColor": "#1e293b",
+    "accentColor": "#f59e0b"
+  },
+  "features": {
+    "realTime": true,
+    "audioStream": false,
+    "pushNotifications": false,
+    "offlineMode": true
+  }
+}

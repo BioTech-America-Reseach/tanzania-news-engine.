@@ -1,0 +1,22 @@
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "files.associations": {
+    "*.css": "css",
+    "*.html": "html",
+    "*.json": "json"
+  },
+  "emmet.includeLanguages": {
+    "html": "html"
+  },
+  "liveServer.settings.port": 5501,
+  "liveServer.settings.root": "/",
+  "liveServer.settings.CustomBrowser": "chrome",
+  "liveServer.settings.ignoreFiles": [
+    ".vscode/**",
+    "**/*.scss",
+    "**/*.sass"
+  ]
+}

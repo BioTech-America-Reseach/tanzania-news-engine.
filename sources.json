@@ -1,0 +1,268 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2024-01-01T00:00:00Z",
+  "totalSources": 9200,
+  "categories": {
+    "tv": {
+      "name": "Televisheni",
+      "count": 45,
+      "sources": [
+        {
+          "id": "azam_tv",
+          "name": "Azam TV",
+          "url": "https://www.azamtv.co.tz",
+          "type": "tv",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "clouds_tv",
+          "name": "Clouds TV",
+          "url": "https://www.cloudstv.co.tz",
+          "type": "tv",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "itv",
+          "name": "ITV",
+          "url": "https://www.itv.co.tz",
+          "type": "tv",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "tbc_1",
+          "name": "TBC 1",
+          "url": "https://www.tbc.go.tz",
+          "type": "tv",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "eatv",
+          "name": "EATV",
+          "url": "https://www.eatv.co.tz",
+          "type": "tv",
+          "priority": "medium",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "star_tv",
+          "name": "Star TV",
+          "url": "https://www.startv.co.tz",
+          "type": "tv",
+          "priority": "medium",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "capital_tv",
+          "name": "Capital TV",
+          "url": "https://www.capitaltv.co.tz",
+          "type": "tv",
+          "priority": "medium",
+          "region": "Dar es Salaam",
+          "active": true
+        }
+      ]
+    },
+    "radio": {
+      "name": "Redio",
+      "count": 120,
+      "sources": [
+        {
+          "id": "radio_one",
+          "name": "Radio One",
+          "url": "https://www.radioone.co.tz",
+          "type": "radio",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "clouds_fm",
+          "name": "Clouds FM",
+          "url": "https://www.cloudsfm.co.tz",
+          "type": "radio",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "times_fm",
+          "name": "Times FM",
+          "url": "https://www.timesfm.co.tz",
+          "type": "radio",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "tbc_fm",
+          "name": "TBC FM",
+          "url": "https://www.tbc.go.tz/radio",
+          "type": "radio",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "bbc_swahili",
+          "name": "BBC Swahili",
+          "url": "https://www.bbc.com/swahili",
+          "type": "radio",
+          "priority": "high",
+          "region": "International",
+          "active": true
+        }
+      ]
+    },
+    "news": {
+      "name": "Magazeti Mtandaoni",
+      "count": 350,
+      "sources": [
+        {
+          "id": "mwananchi",
+          "name": "Mwananchi",
+          "url": "https://www.mwananchi.co.tz",
+          "type": "news",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "the_citizen",
+          "name": "The Citizen",
+          "url": "https://www.thecitizen.co.tz",
+          "type": "news",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "daily_news",
+          "name": "Daily News",
+          "url": "https://www.dailynews.co.tz",
+          "type": "news",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "ipp_media",
+          "name": "IPP Media",
+          "url": "https://www.ippmedia.com",
+          "type": "news",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        }
+      ]
+    },
+    "blogs": {
+      "name": "Mablogu",
+      "count": 4500,
+      "sources": [
+        {
+          "id": "tech_tanzania",
+          "name": "Tech Tanzania",
+          "url": "https://www.techtanzania.com",
+          "type": "blog",
+          "priority": "medium",
+          "region": "Dar es Salaam",
+          "active": true
+        },
+        {
+          "id": "tanzania_news",
+          "name": "Tanzania News Blog",
+          "url": "https://www.tanzanianews.com",
+          "type": "blog",
+          "priority": "medium",
+          "region": "Dar es Salaam",
+          "active": true
+        }
+      ]
+    },
+    "rss": {
+      "name": "RSS Feeds",
+      "count": 3800,
+      "sources": [
+        {
+          "id": "bbc_rss",
+          "name": "BBC Swahili RSS",
+          "url": "https://www.bbc.com/swahili/index.xml",
+          "type": "rss",
+          "priority": "high",
+          "region": "International",
+          "active": true
+        },
+        {
+          "id": "mwananchi_rss",
+          "name": "Mwananchi RSS",
+          "url": "https://www.mwananchi.co.tz/rss",
+          "type": "rss",
+          "priority": "high",
+          "region": "Dar es Salaam",
+          "active": true
+        }
+      ]
+    },
+    "government": {
+      "name": "Tovuti za Serikali",
+      "count": 420,
+      "sources": [
+        {
+          "id": "pmu_go_tz",
+          "name": "Ofisi ya Waziri Mkuu",
+          "url": "https://www.pmu.go.tz",
+          "type": "gov",
+          "priority": "highest",
+          "region": "Dodoma",
+          "active": true
+        },
+        {
+          "id": "moha_go_tz",
+          "name": "Wizara ya Mambo ya Ndani",
+          "url": "https://www.moha.go.tz",
+          "type": "gov",
+          "priority": "highest",
+          "region": "Dodoma",
+          "active": true
+        },
+        {
+          "id": "mof_go_tz",
+          "name": "Wizara ya Fedha",
+          "url": "https://www.mof.go.tz",
+          "type": "gov",
+          "priority": "highest",
+          "region": "Dodoma",
+          "active": true
+        },
+        {
+          "id": "moe_go_tz",
+          "name": "Wizara ya Elimu",
+          "url": "https://www.moe.go.tz",
+          "type": "gov",
+          "priority": "high",
+          "region": "Dodoma",
+          "active": true
+        },
+        {
+          "id": "moh_go_tz",
+          "name": "Wizara ya Afya",
+          "url": "https://www.moh.go.tz",
+          "type": "gov",
+          "priority": "high",
+          "region": "Dodoma",
+          "active": true
+        }
+      ]
+    }
+  }
+}
