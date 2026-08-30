@@ -2,250 +2,982 @@
 <html lang="sw">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Tanzania AI News Engine - Taarifa za Dakika Hii</title>
-    
-    <!-- Meta Tags -->
-    <meta name="description" content="Tanzania AI News Engine - Taarifa za kitaifa zinazotokana na AI">
-    <meta name="theme-color" content="#1e40af">
-    <link rel="manifest" href="/manifest.json">
-    
-    <!-- CDN Libraries -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAARIFA ZA DAKIKA HII - Tanzania AI News</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Custom Styles -->
-    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ====== STYLES ZA HARAKA ====== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            padding-bottom: 80px;
+        }
+        
+        /* Live Indicator */
+        .live-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: pulse-dot 1s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(0.7); }
+        }
+        
+        /* News Cards */
+        .news-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-left: 4px solid #3b82f6;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .news-card:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        .news-card.breaking {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+        .news-card .time {
+            font-size: 11px;
+            color: #6b7280;
+        }
+        .news-card .title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #111827;
+            margin: 4px 0 6px 0;
+            line-height: 1.4;
+        }
+        .news-card .summary {
+            font-size: 14px;
+            color: #4b5563;
+            line-height: 1.5;
+        }
+        
+        /* Breaking Badge */
+        .badge-breaking {
+            background: #ef4444;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 10px;
+            border-radius: 20px;
+            display: inline-block;
+            animation: pulse-badge 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-badge {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* AI Badge */
+        .badge-ai {
+            background: #7c3aed;
+            color: white;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        
+        /* Scroll Ticker */
+        .ticker-wrap {
+            overflow: hidden;
+            background: #1e293b;
+            padding: 8px 0;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .ticker-text {
+            display: inline-block;
+            white-space: nowrap;
+            animation: ticker-scroll 30s linear infinite;
+            color: #f1f5f9;
+            font-size: 14px;
+            padding-left: 100%;
+        }
+        @keyframes ticker-scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+        
+        /* Refresh Button */
+        .btn-refresh {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+        }
+        .btn-refresh:hover {
+            background: #2563eb;
+            transform: scale(1.02);
+        }
+        .btn-refresh:active {
+            transform: scale(0.95);
+        }
+        .btn-refresh:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Count Badge */
+        .count-badge {
+            background: #e5e7eb;
+            color: #374151;
+            padding: 4px 14px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        /* Stats Bar */
+        .stat-item {
+            text-align: center;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .stat-item .number {
+            font-size: 22px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+        .stat-item .label {
+            font-size: 10px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-box {
+            background: white;
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 24px;
+            animation: modal-in 0.25s ease;
+        }
+        @keyframes modal-in {
+            from { transform: translateY(30px) scale(0.95); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        .modal-box .close-btn {
+            float: right;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #6b7280;
+            cursor: pointer;
+        }
+        .modal-box .close-btn:hover { color: #111827; }
+        
+        /* Mobile Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0 12px 0;
+            z-index: 40;
+        }
+        .bottom-nav button {
+            background: none;
+            border: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 10px;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 4px 12px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .bottom-nav button i { font-size: 20px; margin-bottom: 2px; }
+        .bottom-nav button.active { color: #3b82f6; }
+        .bottom-nav button:active { transform: scale(0.9); }
+        
+        /* Scroll to top */
+        .scroll-top {
+            position: fixed;
+            bottom: 80px;
+            right: 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(59,130,246,0.4);
+            display: none;
+            z-index: 30;
+            transition: all 0.2s;
+        }
+        .scroll-top:hover { transform: scale(1.1); }
+        .scroll-top.visible { display: block; }
+        
+        /* Loading Skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    </style>
 </head>
 <body>
-    <!-- ============================================ -->
-    <!-- TOP NAVIGATION - WITH AI STATUS -->
-    <!-- ============================================ -->
-    <header class="bg-gradient-to-r from-blue-900 via-indigo-800 to-blue-900 text-white shadow-2xl sticky top-0 z-50 border-b-4 border-yellow-400">
-        <div class="container mx-auto px-4">
-            <div class="flex flex-wrap items-center justify-between py-3">
-                <div class="flex items-center space-x-3">
-                    <div class="relative">
-                        <i class="fas fa-brain text-3xl text-yellow-400 animate-pulse"></i>
-                        <span class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-ping"></span>
-                    </div>
-                    <div>
-                        <h1 class="text-xl md:text-2xl font-extrabold tracking-tight">
-                            AI <span class="text-yellow-400">Taarifa</span> Tanzania
-                        </h1>
-                        <span class="text-xs opacity-75 hidden md:inline">Powered by Mistral AI</span>
-                    </div>
-                </div>
-                
-                <div class="flex items-center space-x-2 md:space-x-4">
-                    <!-- AI Status -->
-                    <div class="flex items-center space-x-2 bg-white/10 px-3 py-1.5 rounded-full">
-                        <span id="aiStatus" class="flex items-center">
-                            <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-1.5"></span>
-                            <span class="text-xs font-medium">AI Active</span>
-                        </span>
-                    </div>
-                    
-                    <div class="flex items-center space-x-1 text-sm bg-white/10 px-3 py-1.5 rounded-full">
-                        <i class="fas fa-headphones text-green-400"></i>
-                        <span id="activeUsers" class="font-bold">0</span>
-                    </div>
-                    
-                    <button onclick="toggleAudio()" 
-                            class="bg-red-600 hover:bg-red-700 active:scale-95 transition-all px-4 py-2 rounded-full font-semibold text-sm flex items-center space-x-2 shadow-lg">
-                        <i id="playIcon" class="fas fa-play"></i>
-                        <span id="playText" class="hidden sm:inline">Live AI</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </header>
 
-    <!-- ============================================ -->
-    <!-- AI NEWS TICKER -->
-    <!-- ============================================ -->
-    <div class="bg-gradient-to-r from-yellow-50 to-amber-50 border-b-2 border-yellow-200 py-1.5 overflow-hidden">
-        <div class="container mx-auto flex items-center">
-            <span class="flex-shrink-0 font-bold text-green-700 px-4 py-1 bg-green-100 rounded-full text-xs md:text-sm">
-                <i class="fas fa-robot mr-1"></i> AI GENERATED
-            </span>
-            <div class="news-ticker-container flex-1 mx-4 overflow-hidden">
-                <div class="news-ticker" id="tickerText">
-                    🤖 AI inachambua taarifa kutoka vyanzo 10,400+ • Mistral AI inatoa muhtasari wa kitaalamu • Taarifa za dakika hii Tanzania
-                </div>
+<!-- ===== TICKER ===== -->
+<div class="ticker-wrap">
+    <div class="ticker-text" id="tickerText">
+        🔴 HABARI ZA DAKIKA HII: Tanzania AI News Engine inafanya kazi • Taarifa mpya kila dakika 1 • Powered by Mistral AI
+    </div>
+</div>
+
+<!-- ===== HEADER ===== -->
+<header class="bg-white shadow-sm sticky top-0 z-40 border-b border-gray-100">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+                <span class="live-dot"></span>
+                <span class="text-sm font-bold text-gray-800">Dakika Hii</span>
             </div>
+            <span class="text-xs text-gray-400 hidden sm:inline">| Tanzania AI News</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-gray-500" id="lastUpdate">Inasubiri...</span>
+            <button onclick="fetchRealtimeNews()" class="btn-refresh text-sm py-1.5 px-4" id="refreshBtn">
+                <i class="fas fa-sync-alt mr-1.5"></i> Sasa
+            </button>
         </div>
     </div>
+</header>
 
-    <!-- ============================================ -->
-    <!-- AUDIO VISUALIZER -->
-    <!-- ============================================ -->
-    <div id="audioVisualizer" class="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 py-3 px-4 flex items-center justify-center space-x-1 h-20 shadow-inner">
-        <!-- Wave bars - generated by JavaScript -->
-        <div id="waveBars"></div>
+<!-- ===== STATS ===== -->
+<div class="max-w-4xl mx-auto px-4 py-3">
+    <div class="grid grid-cols-3 gap-2">
+        <div class="stat-item">
+            <div class="number" id="storyCount">0</div>
+            <div class="label">Taarifa</div>
+        </div>
+        <div class="stat-item">
+            <div class="number" id="newCount">0</div>
+            <div class="label">Mpya</div>
+        </div>
+        <div class="stat-item">
+            <div class="number" id="sourceCount">10k+</div>
+            <div class="label">Vyanzo</div>
+        </div>
     </div>
+</div>
 
-    <!-- ============================================ -->
-    <!-- MAIN CONTENT -->
-    <!-- ============================================ -->
-    <main class="flex-1 container mx-auto px-4 py-6">
-        <!-- AI Control Panel -->
-        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-md p-4 mb-6 border border-blue-200">
-            <div class="flex flex-wrap items-center justify-between gap-4">
-                <div class="flex items-center space-x-3">
-                    <div class="bg-blue-600 text-white p-3 rounded-full">
-                        <i class="fas fa-robot text-xl"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-blue-900">AI News Engine</h3>
-                        <p class="text-sm text-blue-700" id="aiPromptDisplay">Tayari kupata taarifa</p>
-                    </div>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <button onclick="fetchAINews('latest')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md">
-                        <i class="fas fa-sync-alt mr-1"></i> Latest News
-                    </button>
-                    <button onclick="fetchAINews('breaking')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md">
-                        <i class="fas fa-bolt mr-1"></i> Breaking
-                    </button>
-                    <button onclick="fetchAINews('analysis')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md">
-                        <i class="fas fa-chart-pie mr-1"></i> Analysis
-                    </button>
-                </div>
-            </div>
+<!-- ===== FILTERS ===== -->
+<div class="max-w-4xl mx-auto px-4 pb-2 flex gap-2 overflow-x-auto">
+    <button onclick="filterNews('all')" class="filter-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-blue-600 text-white border-none cursor-pointer transition whitespace-nowrap" data-filter="all">
+        <i class="fas fa-list mr-1"></i> Zote
+    </button>
+    <button onclick="filterNews('breaking')" class="filter-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 border-none cursor-pointer transition whitespace-nowrap" data-filter="breaking">
+        <i class="fas fa-bolt mr-1"></i> Dharura
+    </button>
+    <button onclick="filterNews('business')" class="filter-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 border-none cursor-pointer transition whitespace-nowrap" data-filter="business">
+        <i class="fas fa-chart-line mr-1"></i> Biashara
+    </button>
+    <button onclick="filterNews('health')" class="filter-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 border-none cursor-pointer transition whitespace-nowrap" data-filter="health">
+        <i class="fas fa-heartbeat mr-1"></i> Afya
+    </button>
+    <button onclick="filterNews('sports')" class="filter-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 border-none cursor-pointer transition whitespace-nowrap" data-filter="sports">
+        <i class="fas fa-futbol mr-1"></i> Michezo
+    </button>
+    <button onclick="filterNews('tech')" class="filter-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 border-none cursor-pointer transition whitespace-nowrap" data-filter="tech">
+        <i class="fas fa-microchip mr-1"></i> Teknolojia
+    </button>
+</div>
+
+<!-- ===== NEWS FEED ===== -->
+<div class="max-w-4xl mx-auto px-4 py-2" id="newsFeed">
+    <!-- Loading -->
+    <div class="text-center py-12" id="loadingState">
+        <i class="fas fa-spinner fa-spin text-3xl text-blue-600 mb-3"></i>
+        <p class="text-gray-500">AI inatafuta taarifa za dakika hii...</p>
+        <p class="text-xs text-gray-400 mt-1" id="aiStatusMsg">Mistral AI inachakata</p>
+    </div>
+    
+    <!-- News will be rendered here -->
+    <div id="newsContainer"></div>
+</div>
+
+<!-- ===== MODAL ===== -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+        <div id="modalContent">
+            <div class="text-gray-500">Loading...</div>
         </div>
+    </div>
+</div>
 
-        <!-- System Health Stats -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-            <div class="stat-card bg-white rounded-xl shadow-md p-4">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">AI Sources</p>
-                        <p class="text-2xl font-extrabold text-blue-700" id="sourceCount">10,400+</p>
-                    </div>
-                    <div class="stat-icon bg-blue-100 text-blue-600 p-2 rounded-lg">
-                        <i class="fas fa-globe-africa text-xl"></i>
-                    </div>
-                </div>
-            </div>
+<!-- ===== SCROLL TOP ===== -->
+<button class="scroll-top" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+    <i class="fas fa-arrow-up"></i>
+</button>
+
+<!-- ===== BOTTOM NAV ===== -->
+<div class="bottom-nav">
+    <button class="active" onclick="fetchRealtimeNews(); filterNews('all')">
+        <i class="fas fa-home"></i> Nyumbani
+    </button>
+    <button onclick="fetchRealtimeNews()">
+        <i class="fas fa-sync-alt"></i> Fresh
+    </button>
+    <button onclick="window.scrollTo({top:0,behavior:'smooth'})">
+        <i class="fas fa-arrow-up"></i> Juu
+    </button>
+</div>
+
+<!-- ============================================================ -->
+<!-- JAVASCRIPT - HABARI ZA DAKIKA HII -->
+<!-- ============================================================ -->
+<script>
+// ================================================================
+// CONFIGURATION
+// ================================================================
+const CONFIG = {
+    // Mistral AI API
+    apiKey: '3pDTfrhKfqKtLyrKVwyMhC5A2xd7sv0C',
+    apiUrl: 'https://api.mistral.ai/v1/chat/completions',
+    model: 'mistral-large-latest',
+    
+    // Refresh interval: 60 seconds (dakika 1)
+    refreshInterval: 60000,
+    
+    // Maximum stories to show
+    maxStories: 50,
+    
+    // Story age limit: 24 hours
+    maxAgeHours: 24
+};
+
+// ================================================================
+// STATE
+// ================================================================
+const state = {
+    allStories: [],
+    filteredStories: [],
+    currentFilter: 'all',
+    isFetching: false,
+    lastFetchTime: null,
+    storyIds: new Set(), // For deduplication
+    seenCount: 0
+};
+
+// ================================================================
+// DOM REFS
+// ================================================================
+const $ = id => document.getElementById(id);
+const feed = $('newsContainer');
+const loadingState = $('loadingState');
+const storyCountEl = $('storyCount');
+const newCountEl = $('newCount');
+const lastUpdateEl = $('lastUpdate');
+const tickerEl = $('tickerText');
+const aiStatusMsg = $('aiStatusMsg');
+const modalOverlay = $('modalOverlay');
+const modalContent = $('modalContent');
+const scrollBtn = $('scrollTopBtn');
+
+// ================================================================
+// SYSTEM PROMPT - HABARI ZA DAKIKA HII (NDANI YA SAA 24)
+// ================================================================
+const SYSTEM_PROMPT = `
+Wewe ni mhariri wa habari za Tanzania. Kazi yako ni kutoa taarifa ZA DAKIKA HII tu.
+
+**MUHIMU:** 
+- Taarifa zote ziwe za ndani ya SAA 24 ZILIZOPITA.
+- USITOE taarifa za vikoa vya serikali, ratiba, semina, warsha, au matamashaya.
+- USITOE taarifa zilizopita au za zamani.
+- USIRUDIE taarifa sawa.
+
+**AINA ZA TAARIFA ZINAZOKUBALIWA:**
+1. Habari za dharura (Breaking News) - ajali, maafa, matukio makubwa
+2. Habari za biashara na uchumi - bei, soko, uwekezaji
+3. Habari za afya - magonjwa, chanjo, huduma
+4. Habari za michezo - matokeo, mechi, wachezaji
+5. Habari za teknolojia - uvumbuzi, mtandao, simu
+6. Habari za jamii - maisha, burudani, watu maarufu
+
+**FORMAT:**
+Toa taarifa 5-7 kwa lugha ya Kiswahili. Kila taarifa iwe na:
+- Kichwa (Title): fupi, yenye mvuto
+- Muhtasari (Summary): sentensi 2-3
+- Aina (Category): breaking, business, health, sports, tech, general
+- Athari (Impact): 1-10 (10 ni kubwa)
+- Mkoa (Region): Tanzania, Dar es Salaam, Arusha, n.k.
+
+**KATAZA:** Taarifa za vikoa, ratiba, semina, warsha, matangazo ya serikali.
+**KATAZA:** Kurudia taarifa zilizotolewa hapo awali.
+
+Sasa toa taarifa za dakika hii Tanzania.
+`;
+
+// ================================================================
+// USER PROMPT - INASISITIZA DAKIKA HII
+// ================================================================
+function getUserPrompt() {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('sw-TZ', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = now.toLocaleDateString('sw-TZ', { day: 'numeric', month: 'long', year: 'numeric' });
+    return `Nipe taarifa 6 za dakika hii (saa ${timeStr}, tarehe ${dateStr}) zinazoendelea nchini Tanzania. Taarifa ziwe mpya, za ndani ya saa 24. Usirudie taarifa zilizopita.`;
+}
+
+// ================================================================
+// FETCH REALTIME NEWS FROM MISTRAL AI
+// ================================================================
+async function fetchRealtimeNews() {
+    if (state.isFetching) return;
+    
+    state.isFetching = true;
+    const btn = $('refreshBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Inatafuta...';
+    
+    // Show loading
+    if (state.allStories.length === 0) {
+        loadingState.style.display = 'block';
+        feed.innerHTML = '';
+    }
+    
+    aiStatusMsg.textContent = 'Mistral AI inatafuta taarifa za dakika hii...';
+    
+    try {
+        const response = await fetch(CONFIG.apiUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: CONFIG.model,
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'user', content: getUserPrompt() }
+                ],
+                temperature: 0.4,
+                max_tokens: 1200
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const aiText = data.choices[0].message.content;
+        
+        // Parse AI response
+        const newStories = parseAIStories(aiText);
+        
+        if (newStories && newStories.length > 0) {
+            // Add new stories (deduplicate)
+            let addedCount = 0;
+            for (const story of newStories) {
+                // Create unique ID based on title
+                const storyId = story.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (!state.storyIds.has(storyId)) {
+                    state.storyIds.add(storyId);
+                    story.id = storyId;
+                    story.timestamp = new Date().toISOString();
+                    state.allStories.unshift(story);
+                    addedCount++;
+                }
+            }
             
-            <div class="stat-card bg-white rounded-xl shadow-md p-4">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">AI Stories</p>
-                        <p class="text-2xl font-extrabold text-green-700" id="storyCount">0</p>
-                    </div>
-                    <div class="stat-icon bg-green-100 text-green-600 p-2 rounded-lg">
-                        <i class="fas fa-newspaper text-xl"></i>
-                    </div>
-                </div>
-            </div>
+            // Limit to maxStories
+            if (state.allStories.length > CONFIG.maxStories) {
+                state.allStories = state.allStories.slice(0, CONFIG.maxStories);
+            }
             
-            <div class="stat-card bg-white rounded-xl shadow-md p-4">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">AI Model</p>
-                        <p class="text-lg font-bold text-purple-700">Mistral Large</p>
-                    </div>
-                    <div class="stat-icon bg-purple-100 text-purple-600 p-2 rounded-lg">
-                        <i class="fas fa-microchip text-xl"></i>
-                    </div>
-                </div>
-            </div>
+            state.seenCount += addedCount;
+            state.lastFetchTime = new Date();
             
-            <div class="stat-card bg-white rounded-xl shadow-md p-4">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Last Update</p>
-                        <p class="text-lg font-bold text-yellow-700" id="lastCrawl">Just now</p>
-                    </div>
-                    <div class="stat-icon bg-yellow-100 text-yellow-600 p-2 rounded-lg">
-                        <i class="fas fa-clock text-xl"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
+            // Update UI
+            updateUI();
+            renderNews();
+            
+            // Update ticker with latest story
+            if (state.allStories.length > 0) {
+                const latest = state.allStories[0];
+                tickerEl.textContent = `🔴 ${latest.title} • ${latest.summary || ''}`;
+            }
+            
+            aiStatusMsg.textContent = `✅ Taarifa ${addedCount} mpya zimeingia!`;
+            
+        } else {
+            aiStatusMsg.textContent = '⚠️ Hakuna taarifa mpya. Jaribu tena.';
+        }
+        
+    } catch (error) {
+        console.error('AI Fetch Error:', error);
+        aiStatusMsg.textContent = '❌ Hitilafu: ' + error.message;
+        
+        // If no stories, load demo
+        if (state.allStories.length === 0) {
+            loadDemoNews();
+        }
+    } finally {
+        state.isFetching = false;
+        loadingState.style.display = 'none';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt mr-1.5"></i> Sasa';
+        
+        // Update last update time
+        if (state.lastFetchTime) {
+            lastUpdateEl.textContent = state.lastFetchTime.toLocaleTimeString('sw-TZ');
+        }
+    }
+}
 
-        <!-- Category Tabs -->
-        <div class="flex flex-wrap gap-2 mb-6">
-            <button onclick="switchCategory('all')" 
-                    class="category-tab active bg-blue-600 text-white px-5 py-2.5 rounded-full font-semibold transition-all flex items-center space-x-2 text-sm">
-                <i class="fas fa-list"></i> <span>All</span>
-            </button>
-            <button onclick="switchCategory('government')" 
-                    class="category-tab bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-full font-semibold transition-all flex items-center space-x-2 text-sm">
-                <i class="fas fa-landmark"></i> <span>Government</span>
-            </button>
-            <button onclick="switchCategory('events')" 
-                    class="category-tab bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-full font-semibold transition-all flex items-center space-x-2 text-sm">
-                <i class="fas fa-calendar-check"></i> <span>Events</span>
-            </button>
-            <button onclick="switchCategory('breaking')" 
-                    class="category-tab bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-full font-semibold transition-all flex items-center space-x-2 text-sm">
-                <i class="fas fa-bolt"></i> <span>Breaking</span>
-            </button>
-        </div>
+// ================================================================
+// PARSE AI RESPONSE
+// ================================================================
+function parseAIStories(text) {
+    try {
+        // Try JSON first
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try {
+                const parsed = JSON.parse(jsonMatch[0]);
+                let items = parsed.stories || parsed.items || parsed.news || [];
+                if (Array.isArray(items) && items.length > 0) {
+                    return items.map(item => ({
+                        title: item.title || item.kichwa || 'Taarifa mpya',
+                        summary: item.summary || item.muhtasari || item.content || '',
+                        category: item.category || item.aina || 'general',
+                        impact: item.impact || item.athari || 5,
+                        region: item.region || item.mkoa || 'Tanzania',
+                        content: item.content || item.maelezo || item.summary || ''
+                    }));
+                }
+            } catch (e) {}
+        }
+        
+        // Parse from text - find numbered items
+        const stories = [];
+        const lines = text.split('\n').filter(l => l.trim());
+        let current = null;
+        
+        for (const line of lines) {
+            const trimmed = line.trim();
+            
+            // Check for numbered item (1., 2., etc)
+            const numMatch = trimmed.match(/^(\d+)[\.\)]\s*(.+)/);
+            if (numMatch) {
+                if (current) stories.push(current);
+                current = {
+                    title: numMatch[2].trim(),
+                    summary: '',
+                    category: 'general',
+                    impact: 5,
+                    region: 'Tanzania',
+                    content: ''
+                };
+                continue;
+            }
+            
+            // Check for bold title (all caps or with **)
+            if (trimmed.match(/^[A-Z][A-Z\s]{3,}/) || trimmed.match(/^\*\*.+\*\*/)) {
+                if (current) stories.push(current);
+                current = {
+                    title: trimmed.replace(/\*\*/g, '').trim(),
+                    summary: '',
+                    category: 'general',
+                    impact: 5,
+                    region: 'Tanzania',
+                    content: ''
+                };
+                continue;
+            }
+            
+            // Add to current story
+            if (current) {
+                // Check for category
+                if (trimmed.toLowerCase().includes('category') || trimmed.toLowerCase().includes('aina')) {
+                    const parts = trimmed.split(':');
+                    if (parts.length > 1) {
+                        current.category = parts[1].trim().toLowerCase();
+                    }
+                } else if (trimmed.toLowerCase().includes('impact') || trimmed.toLowerCase().includes('athari')) {
+                    const parts = trimmed.split(':');
+                    if (parts.length > 1) {
+                        const num = parseInt(parts[1].trim());
+                        if (!isNaN(num)) current.impact = Math.min(10, Math.max(1, num));
+                    }
+                } else if (trimmed.toLowerCase().includes('region') || trimmed.toLowerCase().includes('mkoa')) {
+                    const parts = trimmed.split(':');
+                    if (parts.length > 1) {
+                        current.region = parts[1].trim();
+                    }
+                } else {
+                    // Add to summary/content
+                    if (!current.summary) {
+                        current.summary = trimmed;
+                    } else if (current.summary.length < 150) {
+                        current.summary += ' ' + trimmed;
+                    } else {
+                        current.content = (current.content || '') + ' ' + trimmed;
+                    }
+                }
+            }
+        }
+        
+        if (current) stories.push(current);
+        
+        // Filter out government/ratiba stories
+        const filtered = stories.filter(s => {
+            const text = (s.title + ' ' + s.summary + ' ' + s.content).toLowerCase();
+            const govKeywords = ['serikali', 'waziri', 'rais', 'mkutano', 'ratiba', 'semina', 'warsha', 'tamasha', 'maadhimisho', 'vikao', 'baraza'];
+            for (const kw of govKeywords) {
+                if (text.includes(kw)) return false;
+            }
+            return true;
+        });
+        
+        return filtered.length > 0 ? filtered : stories;
+        
+    } catch (error) {
+        console.error('Parse error:', error);
+        return [];
+    }
+}
 
-        <!-- Content Feed -->
-        <div id="contentFeed" class="space-y-4">
-            <!-- Loading -->
-            <div class="text-center py-12">
-                <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
-                <p class="text-gray-500">AI inachakata taarifa...</p>
-                <p class="text-xs text-gray-400 mt-1" id="loadingStatus">Inasubiri data kutoka Mistral AI</p>
-            </div>
-        </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 py-6 mt-8">
-        <div class="container mx-auto px-4 text-center text-sm text-gray-600">
-            <p>Powered by <span class="font-bold text-blue-600">Mistral AI</span> • Tanzania National Information Engine</p>
-        </div>
-    </footer>
-
-    <!-- ============================================ -->
-    <!-- MODAL -->
-    <!-- ============================================ -->
-    <div id="detailModal" class="fixed inset-0 z-50 hidden modal-overlay flex items-center justify-center p-4" onclick="closeModal(event)">
-        <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onclick="event.stopPropagation()">
-            <div class="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-5 flex justify-between items-center sticky top-0 z-10">
-                <h2 class="text-xl font-bold flex items-center space-x-2">
-                    <i class="fas fa-robot text-yellow-400"></i>
-                    <span id="modalTitle">AI Generated Story</span>
-                </h2>
-                <button onclick="closeModal()" class="text-white/70 hover:text-white transition p-2 rounded-full hover:bg-white/10">
-                    <i class="fas fa-times text-xl"></i>
+// ================================================================
+// RENDER NEWS
+// ================================================================
+function renderNews() {
+    const stories = state.currentFilter === 'all' 
+        ? state.allStories 
+        : state.allStories.filter(s => s.category === state.currentFilter);
+    
+    state.filteredStories = stories;
+    
+    if (stories.length === 0) {
+        feed.innerHTML = `
+            <div class="text-center py-12 text-gray-500">
+                <i class="fas fa-inbox text-4xl mb-3 block text-gray-300"></i>
+                <p>Hakuna taarifa za dakika hii</p>
+                <button onclick="fetchRealtimeNews()" class="mt-3 text-blue-600 font-semibold">
+                    <i class="fas fa-sync-alt mr-1"></i> Jaribu tena
                 </button>
             </div>
-            <div class="p-6 overflow-y-auto max-h-[75vh]" id="modalContent"></div>
-            <div class="border-t border-gray-200 p-4 bg-gray-50 flex justify-between items-center">
-                <span class="text-xs text-gray-400"><i class="fas fa-robot mr-1"></i> Generated by AI</span>
-                <button onclick="closeModal()" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-semibold transition">Close</button>
+        `;
+        return;
+    }
+    
+    feed.innerHTML = stories.map((story, index) => {
+        const isBreaking = story.category === 'breaking';
+        const isNew = index < 3;
+        const timeAgo = getTimeAgo(story.timestamp);
+        
+        return `
+            <div class="news-card ${isBreaking ? 'breaking' : ''}" onclick="openModal('${story.id}')">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                            ${isBreaking ? '<span class="badge-breaking"><i class="fas fa-bolt mr-1"></i>DHARURA</span>' : ''}
+                            ${isNew ? '<span class="text-xs text-blue-600 font-semibold">🆕 Mpya</span>' : ''}
+                            <span class="badge-ai">AI</span>
+                            <span class="time">${timeAgo}</span>
+                        </div>
+                        <div class="title">${story.title}</div>
+                        <div class="summary">${story.summary || ''}</div>
+                        <div class="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                            <span><i class="fas fa-tag mr-1"></i>${formatCategory(story.category)}</span>
+                            ${story.impact ? `<span><i class="fas fa-exclamation-triangle mr-1"></i>Impact: ${story.impact}/10</span>` : ''}
+                            ${story.region ? `<span><i class="fas fa-map-marker-alt mr-1"></i>${story.region}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="ml-3 text-gray-300">
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ================================================================
+// GET TIME AGO
+// ================================================================
+function getTimeAgo(timestamp) {
+    if (!timestamp) return 'Sasa hivi';
+    try {
+        const date = new Date(timestamp);
+        if (isNaN(date.getTime())) return 'Sasa hivi';
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMin = Math.floor(diffMs / 60000);
+        if (diffMin < 1) return 'Dakika hii';
+        if (diffMin < 60) return `${diffMin}m iliyopita`;
+        const diffHour = Math.floor(diffMin / 60);
+        if (diffHour < 24) return `${diffHour}h iliyopita`;
+        return date.toLocaleDateString('sw-TZ');
+    } catch (e) {
+        return 'Sasa hivi';
+    }
+}
+
+// ================================================================
+// FORMAT CATEGORY
+// ================================================================
+function formatCategory(cat) {
+    const names = {
+        breaking: 'Dharura',
+        business: 'Biashara',
+        health: 'Afya',
+        sports: 'Michezo',
+        tech: 'Teknolojia',
+        general: 'Mengine'
+    };
+    return names[cat] || cat || 'Mengine';
+}
+
+// ================================================================
+// FILTER NEWS
+// ================================================================
+function filterNews(filter) {
+    state.currentFilter = filter;
+    
+    // Update buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        const f = btn.dataset.filter;
+        if (f === filter) {
+            btn.className = 'filter-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-blue-600 text-white border-none cursor-pointer transition whitespace-nowrap';
+        } else {
+            btn.className = 'filter-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 border-none cursor-pointer transition whitespace-nowrap hover:bg-gray-200';
+        }
+    });
+    
+    renderNews();
+}
+
+// ================================================================
+// UPDATE UI STATS
+// ================================================================
+function updateUI() {
+    storyCountEl.textContent = state.allStories.length;
+    newCountEl.textContent = state.seenCount;
+}
+
+// ================================================================
+// MODAL
+// ================================================================
+function openModal(storyId) {
+    const story = state.allStories.find(s => s.id === storyId);
+    if (!story) return;
+    
+    const html = `
+        <div>
+            <div class="flex items-center gap-2 mb-3 flex-wrap">
+                ${story.category === 'breaking' ? '<span class="badge-breaking"><i class="fas fa-bolt mr-1"></i>DHARURA</span>' : ''}
+                <span class="badge-ai">AI</span>
+                <span class="text-xs text-gray-400">${getTimeAgo(story.timestamp)}</span>
+            </div>
+            <h2 class="text-xl font-bold mb-3">${story.title}</h2>
+            <div class="text-gray-700 leading-relaxed whitespace-pre-wrap mb-4">
+                ${story.content || story.summary || 'Hakuna maelezo zaidi.'}
+            </div>
+            <div class="flex flex-wrap gap-3 text-sm text-gray-500 border-t pt-3">
+                <span><i class="fas fa-tag mr-1"></i>${formatCategory(story.category)}</span>
+                ${story.impact ? `<span><i class="fas fa-exclamation-triangle mr-1"></i>Impact: ${story.impact}/10</span>` : ''}
+                ${story.region ? `<span><i class="fas fa-map-marker-alt mr-1"></i>${story.region}</span>` : ''}
+                <span><i class="fas fa-clock mr-1"></i>${new Date(story.timestamp).toLocaleString('sw-TZ')}</span>
             </div>
         </div>
-    </div>
+    `;
+    
+    modalContent.innerHTML = html;
+    modalOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
 
-    <!-- ============================================ -->
-    <!-- MOBILE BOTTOM NAV -->
-    <!-- ============================================ -->
-    <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40">
-        <div class="flex justify-around items-center py-2">
-            <button onclick="switchCategory('all')" class="mobile-nav-btn flex flex-col items-center text-xs text-blue-600">
-                <i class="fas fa-home text-lg"></i> <span>Home</span>
-            </button>
-            <button onclick="fetchAINews('latest')" class="mobile-nav-btn flex flex-col items-center text-xs text-green-600">
-                <i class="fas fa-robot text-lg"></i> <span>AI News</span>
-            </button>
-            <button onclick="toggleAudio()" class="flex flex-col items-center text-xs text-red-600">
-                <i id="mobilePlayIcon" class="fas fa-play-circle text-3xl"></i>
-                <span id="mobilePlayText">Listen</span>
-            </button>
-        </div>
-    </div>
+function closeModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    modalOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+}
 
-    <!-- JavaScript -->
-    <script src="app.js"></script>
+// ================================================================
+// DEMO NEWS (FALLBACK - HABARI ZA DAKIKA HII)
+// ================================================================
+function loadDemoNews() {
+    const now = new Date();
+    const demos = [
+        {
+            id: 'demo1',
+            title: 'Bei ya Mafuta Yashuka Tanzania, Wananchi Wafarijika',
+            summary: 'Bei ya mafuta nchini imeshuka kwa asilimia 5 baada ya mabadiliko ya soko la duniani. Wananchi wamefarijika na kupungua kwa gharama za usafiri.',
+            category: 'business',
+            impact: 7,
+            region: 'Dar es Salaam',
+            timestamp: new Date(now - 1000 * 60 * 5).toISOString(),
+            content: 'Bei ya mafuta nchini Tanzania imeshuka kwa asilimia 5 kutokana na mabadiliko ya soko la mafuta duniani. Waziri wa Nishati amethibitisha kupungua kwa bei huku wananchi wakieleza furaha yao. Hii ni hatua nzuri kwa uchumi wa nchi.'
+        },
+        {
+            id: 'demo2',
+            title: 'Timu ya Taifa Yaandaa Mechi ya Kirafiki Dhidi ya Kenya',
+            summary: 'Timu ya Taifa ya Tanzania inajiandaa kwa mechi ya kirafiki dhidi ya Kenya mwishoni mwa wiki. Wachezaji wamejitahidi kwenye mazoezi.',
+            category: 'sports',
+            impact: 6,
+            region: 'Dar es Salaam',
+            timestamp: new Date(now - 1000 * 60 * 15).toISOString(),
+            content: 'Timu ya Taifa ya Tanzania (Taifa Stars) inaendelea na mazoezi makali kwa ajili ya mechi ya kirafiki dhidi ya Kenya itakayofanyika mwishoni mwa wiki. Kocha mkuu amesema wachezaji wako tayari na wanatarajia ushindi.'
+        },
+        {
+            id: 'demo3',
+            title: 'Wizara ya Afya Yatoa Onyo la Mafua Nchini',
+            summary: 'Wizara ya Afya imetoa onyo kwa wananchi kuhusu mafua yanayoenea katika mikoa mingi. Wananchi wanashauriwa kuchukua tahadhari.',
+            category: 'health',
+            impact: 8,
+            region: 'Dodoma',
+            timestamp: new Date(now - 1000 * 60 * 30).toISOString(),
+            content: 'Wizara ya Afya imetoa taarifa kwa umma kuhusu mafua yanayoenea katika mikoa mingi nchini. Wananchi wanashauriwa kuvaa barakoa, kunawa mikono, na kutafuta matibabu mapema. Hospitali zimetayarishwa kuhudumia wagonjwa.'
+        },
+        {
+            id: 'demo4',
+            title: 'Kampuni ya Simu Yaanzisha Huduma Mpya ya Mtandao wa 5G',
+            summary: 'Kampuni moja kubwa ya simu nchini imezindua huduma ya mtandao wa 5G katika miji mikubwa. Wateja wanaweza sasa kufurahia kasi ya juu.',
+            category: 'tech',
+            impact: 7,
+            region: 'Dar es Salaam',
+            timestamp: new Date(now - 1000 * 60 * 45).toISOString(),
+            content: 'Kampuni ya simu ya Vodacom Tanzania imezindua rasmi huduma ya mtandao wa 5G katika miji ya Dar es Salaam, Arusha na Mwanza. Wateja wanaweza sasa kufurahia kasi ya juu ya mtandao na huduma bora za kidijitali. Hii ni hatua kubwa katika teknolojia nchini.'
+        },
+        {
+            id: 'demo5',
+            title: 'Mvua Kubwa Yanyesha Mkoani Tanga, Wananchi Waomba Msaada',
+            summary: 'Mvua kubwa imenyesha mkoani Tanga na kusababisha mafuriko katika maeneo mengi. Wananchi wameomba msaada kutoka serikali.',
+            category: 'breaking',
+            impact: 9,
+            region: 'Tanga',
+            timestamp: new Date(now - 1000 * 60 * 60).toISOString(),
+            content: 'Mvua kubwa imenyesha mkoani Tanga kwa saa nyingi, na kusababisha mafuriko katika maeneo mengi. Nyumba na barabara zimeathirika. Wananchi wameomba msaada wa dharura kutoka serikali na mashirika ya misaada. Hali ni mbaya katika baadhi ya maeneo.'
+        }
+    ];
+    
+    // Add to state
+    for (const story of demos) {
+        if (!state.storyIds.has(story.id)) {
+            state.storyIds.add(story.id);
+            state.allStories.push(story);
+        }
+    }
+    
+    state.seenCount = demos.length;
+    state.lastFetchTime = new Date();
+    
+    updateUI();
+    renderNews();
+    
+    if (state.allStories.length > 0) {
+        tickerEl.textContent = `🔴 ${state.allStories[0].title} • ${state.allStories[0].summary || ''}`;
+    }
+    
+    aiStatusMsg.textContent = '📰 Taarifa za mfano zimeonyeshwa';
+    lastUpdateEl.textContent = new Date().toLocaleTimeString('sw-TZ');
+}
+
+// ================================================================
+// SCROLL BUTTON
+// ================================================================
+window.addEventListener('scroll', () => {
+    if (window.scrollY > 300) {
+        scrollBtn.classList.add('visible');
+    } else {
+        scrollBtn.classList.remove('visible');
+    }
+});
+
+// ================================================================
+// KEYBOARD SHORTCUTS
+// ================================================================
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'r' || e.key === 'R') fetchRealtimeNews();
+    if (e.key === ' ' || e.key === 'Space') {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+});
+
+// ================================================================
+// INIT - START FETCHING
+// ================================================================
+console.log('🚀 Tanzania AI News Engine - Habari za Dakika Hii');
+console.log('📡 Mistral AI configured');
+console.log('⏰ Refresh every 60 seconds');
+
+// Load initial news
+fetchRealtimeNews();
+
+// Auto refresh every 60 seconds
+setInterval(fetchRealtimeNews, CONFIG.refreshInterval);
+
+// ================================================================
+// EXPOSE GLOBALS
+// ================================================================
+window.fetchRealtimeNews = fetchRealtimeNews;
+window.filterNews = filterNews;
+window.openModal = openModal;
+window.closeModal = closeModal;
+
+console.log('✅ Engine running - taarifa mpya kila dakika 1');
+</script>
+
 </body>
 </html>
