@@ -1,10 +1,7 @@
 /* =============================================
-   TANZANIA NEWS ENGINE - CUSTOM STYLES
+   TANZANIA AI NEWS ENGINE - CUSTOM STYLES
    ============================================= */
 
-/* =============================================
-   ROOT VARIABLES
-   ============================================= */
 :root {
     --primary-blue: #1e40af;
     --primary-blue-dark: #1e3a8a;
@@ -12,6 +9,8 @@
     --gold: #f59e0b;
     --red: #dc2626;
     --green: #16a34a;
+    --purple: #7c3aed;
+    
     --gray-50: #f9fafb;
     --gray-100: #f3f4f6;
     --gray-200: #e5e7eb;
@@ -22,18 +21,8 @@
     --gray-700: #374151;
     --gray-800: #1f2937;
     --gray-900: #111827;
-    
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
 }
 
-/* =============================================
-   BASE STYLES
-   ============================================= */
 * {
     margin: 0;
     padding: 0;
@@ -45,8 +34,7 @@ body {
     background: var(--gray-50);
     color: var(--gray-900);
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    padding-bottom: 70px; /* Space for mobile bottom nav */
+    padding-bottom: 70px;
 }
 
 @media (min-width: 768px) {
@@ -56,7 +44,7 @@ body {
 }
 
 /* =============================================
-   SCROLLBAR STYLING
+   SCROLLBAR
    ============================================= */
 ::-webkit-scrollbar {
     width: 8px;
@@ -90,26 +78,20 @@ body {
 }
 
 @keyframes pulse-live {
-    0%, 100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-    50% {
-        opacity: 0.3;
-        transform: scale(0.8);
-    }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.8); }
 }
 
 /* =============================================
-   AUDIO WAVE VISUALIZER
+   WAVE BARS
    ============================================= */
 .wave-bar {
     display: inline-block;
     width: 4px;
     margin: 0 1.5px;
-    background: linear-gradient(to top, #ef4444, #f59e0b);
+    background: linear-gradient(to top, #3b82f6, #8b5cf6);
     border-radius: 2px;
-    height: 20px;
+    height: 15px;
     transition: height 0.1s ease;
 }
 
@@ -121,12 +103,8 @@ body {
 }
 
 @keyframes waveform {
-    0%, 100% {
-        height: 15px;
-    }
-    50% {
-        height: 55px;
-    }
+    0%, 100% { height: 10px; }
+    50% { height: 50px; }
 }
 
 /* =============================================
@@ -140,17 +118,13 @@ body {
 .news-ticker {
     display: inline-block;
     white-space: nowrap;
-    animation: scroll-ticker 25s linear infinite;
+    animation: scroll-ticker 30s linear infinite;
     padding-left: 100%;
 }
 
 @keyframes scroll-ticker {
-    0% {
-        transform: translateX(0);
-    }
-    100% {
-        transform: translateX(-50%);
-    }
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
 }
 
 .news-ticker:hover {
@@ -163,6 +137,7 @@ body {
 .stat-card {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid var(--gray-200);
+    background: white;
 }
 
 .stat-card:hover {
@@ -209,24 +184,13 @@ body {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid var(--gray-200);
     cursor: pointer;
-    position: relative;
-    overflow: hidden;
-}
-
-.story-card::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, transparent 50%, rgba(30, 64, 175, 0.02));
-    pointer-events: none;
+    background: white;
 }
 
 .story-card:hover {
     transform: translateY(-2px);
     border-color: var(--primary-blue-light);
+    box-shadow: var(--shadow-xl);
 }
 
 .story-card:active {
@@ -246,7 +210,6 @@ body {
 .modal-overlay {
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     animation: fadeIn 0.25s ease;
 }
 
@@ -255,27 +218,17 @@ body {
 }
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 @keyframes slideUp {
-    from {
-        transform: translateY(30px) scale(0.95);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-    }
+    from { transform: translateY(30px) scale(0.95); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
 }
 
 /* =============================================
-   MOBILE BOTTOM NAV
+   MOBILE NAV
    ============================================= */
 .mobile-nav-btn {
     transition: all 0.2s ease;
@@ -287,118 +240,48 @@ body {
     transform: scale(0.9);
 }
 
-.mobile-nav-btn i {
-    transition: all 0.2s ease;
-}
-
-.mobile-nav-btn:active i {
-    transform: scale(1.2);
-}
-
 /* =============================================
-   LOADING SKELETON
-   ============================================= */
-.skeleton {
-    background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-100) 50%, var(--gray-200) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 4px;
-}
-
-@keyframes shimmer {
-    0% {
-        background-position: -200% 0;
-    }
-    100% {
-        background-position: 200% 0;
-    }
-}
-
-/* =============================================
-   RESPONSIVE UTILITIES
+   RESPONSIVE
    ============================================= */
 @media (max-width: 480px) {
-    .container {
-        padding-left: 12px;
-        padding-right: 12px;
-    }
-    
-    .stat-card p:first-child {
-        font-size: 10px;
-    }
-    
-    .stat-card .text-2xl {
-        font-size: 1.25rem;
-    }
-    
-    .story-card .text-lg {
-        font-size: 1rem;
-    }
+    .container { padding-left: 12px; padding-right: 12px; }
+    .stat-card p:first-child { font-size: 10px; }
+    .stat-card .text-2xl { font-size: 1.25rem; }
+    .story-card .text-lg { font-size: 1rem; }
 }
 
-@media (min-width: 768px) and (max-width: 1024px) {
-    .stat-card .text-2xl {
-        font-size: 1.5rem;
-    }
-}
-
-/* =============================================
-   PRINT STYLES
-   ============================================= */
 @media print {
-    .sticky-top,
-    #audioVisualizer,
-    .news-ticker-container,
-    .mobile-nav-btn,
-    button {
+    .sticky-top, #audioVisualizer, .news-ticker-container, .mobile-nav-btn, button {
         display: none !important;
     }
-    
-    body {
-        padding: 20px;
-        background: white;
-    }
-    
-    .story-card {
-        break-inside: avoid;
-        box-shadow: none;
-        border: 1px solid #ddd;
-    }
+    body { padding: 20px; background: white; }
+    .story-card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
 }
 
-/* =============================================
-   DARK MODE SUPPORT (Optional)
-   ============================================= */
-@media (prefers-color-scheme: dark) {
-    /* You can add dark mode styles here if needed */
-    /* Currently keeping it light for readability */
-}
-
-/* =============================================
-   ACCESSIBILITY
-   ============================================= */
 @media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-    }
+    * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
-/* Focus styles for keyboard navigation */
-button:focus-visible,
-a:focus-visible,
-[tabindex]:focus-visible {
+button:focus-visible {
     outline: 2px solid var(--primary-blue);
     outline-offset: 2px;
 }
 
-/* High contrast mode */
-@media (forced-colors: active) {
-    .stat-card,
-    .story-card,
-    .category-tab {
-        border: 2px solid currentColor;
-    }
+/* AI Specific Styles */
+.ai-badge {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.ai-pulse {
+    animation: aiPulse 2s ease-in-out infinite;
+}
+
+@keyframes aiPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
